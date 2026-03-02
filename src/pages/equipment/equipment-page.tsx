@@ -13,8 +13,8 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
-import { useEquipment } from '@/hooks/use-database'
-import type { Equipment } from '@/types/electron'
+import { equipmentDb } from '@/lib/db'
+import type { Equipment } from '@/lib/types'
 
 function EquipmentError({ error, resetErrorBoundary }: { error: Error; resetErrorBoundary: () => void }) {
   return (
@@ -31,7 +31,8 @@ function EquipmentError({ error, resetErrorBoundary }: { error: Error; resetErro
 
 function EquipmentPageContent() {
   const { projectId } = useParams()
-  const { equipment, loading, error, createEquipment, updateEquipment, deleteEquipment } = useEquipment(projectId)
+  const [equipment, setEquipment] = useState<Equipment[]>([])
+  const [loading, setLoading] = useState(true)
   
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
@@ -46,6 +47,23 @@ function EquipmentPageContent() {
     notes: '',
   })
 
+  const loadEquipment = async () => {
+    setLoading(true)
+    try {
+      const allEquipment = await equipmentDb.getAll()
+      setEquipment(allEquipment)
+    } catch (error) {
+      console.error('Failed to load equipment:', error)
+      toast.error('Failed to load equipment')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadEquipment()
+  }, [])
+
   const projectEquipment = equipment || []
   const availableCount = projectEquipment.filter(e => e.status === 'available').length
   const inUseCount = projectEquipment.filter(e => e.status === 'in-use').length
@@ -57,16 +75,18 @@ function EquipmentPageContent() {
       return
     }
 
-    const result = await createEquipment({
-      name: formData.name,
-      type: formData.type,
-      asset_tag: formData.asset_tag || undefined,
-      status: 'available',
-      assigned_to: formData.assigned_to || undefined,
-      notes: formData.notes || undefined,
-    })
+    try {
+      await equipmentDb.create({
+        name: formData.name,
+        type: formData.type,
+        assetTag: formData.asset_tag || undefined,
+        status: 'available',
+        assignedTo: formData.assigned_to || undefined,
+        notes: formData.notes || undefined,
+      })
 
-    if (result.success) {
+      await loadEquipment()
+      window.dispatchEvent(new CustomEvent('dataUpdated', { detail: { type: 'equipment', action: 'create' } }))
       setIsCreateOpen(false)
       setFormData({
         name: '',
@@ -77,8 +97,9 @@ function EquipmentPageContent() {
         notes: '',
       })
       toast.success('Equipment added')
-    } else {
-      toast.error(result.error || 'Failed to add equipment')
+    } catch (error: any) {
+      console.error('Failed to add equipment:', error)
+      toast.error(error.message || 'Failed to add equipment')
     }
   }
 
@@ -101,16 +122,18 @@ function EquipmentPageContent() {
       return
     }
 
-    const result = await updateEquipment(editingEquipment.id, {
-      name: formData.name,
-      type: formData.type,
-      asset_tag: formData.asset_tag || undefined,
-      status: formData.status,
-      assigned_to: formData.assigned_to || undefined,
-      notes: formData.notes || undefined,
-    })
+    try {
+      await equipmentDb.update(editingEquipment.id, {
+        name: formData.name,
+        type: formData.type,
+        assetTag: formData.asset_tag || undefined,
+        status: formData.status,
+        assignedTo: formData.assigned_to || undefined,
+        notes: formData.notes || undefined,
+      })
 
-    if (result.success) {
+      await loadEquipment()
+      window.dispatchEvent(new CustomEvent('dataUpdated', { detail: { type: 'equipment', action: 'update' } }))
       setIsEditOpen(false)
       setEditingEquipment(null)
       setFormData({
@@ -122,17 +145,21 @@ function EquipmentPageContent() {
         notes: '',
       })
       toast.success('Equipment updated')
-    } else {
-      toast.error(result.error || 'Failed to update equipment')
+    } catch (error: any) {
+      console.error('Failed to update equipment:', error)
+      toast.error(error.message || 'Failed to update equipment')
     }
   }
 
   const handleDelete = async (equipmentId: string) => {
-    const result = await deleteEquipment(equipmentId, 'Current User')
-    if (result.success) {
+    try {
+      await equipmentDb.delete(equipmentId)
+      await loadEquipment()
+      window.dispatchEvent(new CustomEvent('dataUpdated', { detail: { type: 'equipment', action: 'delete' } }))
       toast.success('Equipment deleted')
-    } else {
-      toast.error(result.error || 'Failed to delete equipment')
+    } catch (error: any) {
+      console.error('Failed to delete equipment:', error)
+      toast.error(error.message || 'Failed to delete equipment')
     }
   }
 

@@ -7,9 +7,11 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { projectsDb, equipmentDb, checklistsDb, rfisDb } from '@/lib/db'
 import { useKV } from '@github/spark/hooks'
+import { useDatabase } from '@/hooks/use-database'
 import type { Project, Equipment, Checklist, RFI, Task, Alert as AlertType, Submittal } from '@/lib/types'
 
 export function DashboardPage() {
+  const { isDesktop } = useDatabase()
   const [projects, setProjects] = useState<Project[]>([])
   const [equipment, setEquipment] = useState<Equipment[]>([])
   const [checklists, setChecklists] = useState<Checklist[]>([])
@@ -17,6 +19,7 @@ export function DashboardPage() {
   const [allTasks] = useKV<Task[]>('tasks', [])
   const [alerts] = useKV<AlertType[]>('alerts', [])
   const [submittals] = useKV<Submittal[]>('submittals', [])
+  const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
     const loadData = async () => {
@@ -32,6 +35,15 @@ export function DashboardPage() {
       setRfis(r)
     }
     loadData()
+  }, [refreshKey])
+
+  useEffect(() => {
+    const handleDataChange = () => {
+      setRefreshKey(prev => prev + 1)
+    }
+
+    window.addEventListener('dataUpdated', handleDataChange)
+    return () => window.removeEventListener('dataUpdated', handleDataChange)
   }, [])
 
   const activeProjects = projects.filter((p) => p.status === 'active')

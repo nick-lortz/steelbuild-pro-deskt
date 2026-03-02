@@ -64,6 +64,7 @@ export function RFIsPage() {
       })
       
       await loadRFIs()
+      window.dispatchEvent(new CustomEvent('dataUpdated', { detail: { type: 'rfi', action: 'create' } }))
       setIsCreateOpen(false)
       setFormData({
         number: '',
@@ -102,6 +103,7 @@ export function RFIsPage() {
     try {
       await rfisDb.update(editingRFI.id, formData)
       await loadRFIs()
+      window.dispatchEvent(new CustomEvent('dataUpdated', { detail: { type: 'rfi', action: 'update' } }))
       setIsEditOpen(false)
       setEditingRFI(null)
       setFormData({
@@ -123,6 +125,7 @@ export function RFIsPage() {
     try {
       await rfisDb.delete(rfiId)
       await loadRFIs()
+      window.dispatchEvent(new CustomEvent('dataUpdated', { detail: { type: 'rfi', action: 'delete' } }))
       toast.success('RFI deleted successfully')
     } catch (error: any) {
       console.error('Failed to delete RFI:', error)
