@@ -350,18 +350,21 @@ function EquipmentPageContent() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Project Equipment</CardTitle>
+      <Card className="border-border/50 shadow-lg">
+        <CardHeader className="border-b border-border/50 bg-gradient-to-b from-muted/30 to-muted/10">
+          <CardTitle className="text-lg">Project Equipment</CardTitle>
           <CardDescription>Equipment assigned to this project</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {projectEquipment.length === 0 ? (
-            <div className="text-center py-12">
-              <Gear className="mx-auto text-muted-foreground mb-4" size={48} />
-              <p className="text-muted-foreground mb-4">No equipment assigned</p>
+            <div className="text-center py-16 px-4">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted/30 mb-4">
+                <Gear className="text-muted-foreground" size={32} weight="duotone" />
+              </div>
+              <h3 className="font-semibold text-lg mb-2">No equipment assigned</h3>
+              <p className="text-muted-foreground text-sm mb-6">Add equipment to start tracking usage and availability</p>
               <Button onClick={() => setIsCreateOpen(true)}>
-                <Plus className="mr-2" />
+                <Plus className="mr-2" size={16} />
                 Add First Equipment
               </Button>
             </div>
@@ -380,27 +383,52 @@ function EquipmentPageContent() {
               <TableBody>
                 {projectEquipment.map(equip => (
                   <TableRow key={equip.id}>
-                    <TableCell className="font-medium">{equip.name}</TableCell>
-                    <TableCell className="capitalize">{equip.type}</TableCell>
-                    <TableCell>{equip.asset_tag || '-'}</TableCell>
+                    <TableCell className="font-semibold text-foreground">{equip.name}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="capitalize font-medium">
+                        {equip.type}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {equip.asset_tag ? (
+                        <span className="font-mono text-sm">{equip.asset_tag}</span>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">Not set</span>
+                      )}
+                    </TableCell>
                     <TableCell>{getStatusBadge(equip.status)}</TableCell>
-                    <TableCell>{equip.assigned_to || '-'}</TableCell>
+                    <TableCell>
+                      {equip.assigned_to ? (
+                        <span className="text-sm font-medium">{equip.assigned_to}</span>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">Unassigned</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => handleEdit(equip)}>
-                          <PencilSimple />
+                      <div className="flex justify-end gap-1">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => handleEdit(equip)}
+                          className="hover:bg-accent/10"
+                        >
+                          <PencilSimple size={16} />
                         </Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <Trash />
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              className="hover:bg-destructive/10 hover:text-destructive"
+                            >
+                              <Trash size={16} />
                             </Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
                               <AlertDialogTitle>Remove Equipment</AlertDialogTitle>
                               <AlertDialogDescription>
-                                Are you sure you want to remove this equipment from the project?
+                                Are you sure you want to remove <strong>{equip.name}</strong> from the project? This action cannot be undone.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>

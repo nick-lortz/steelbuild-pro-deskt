@@ -373,17 +373,19 @@ export function RFIsPage() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>RFI List</CardTitle>
+      <Card className="border-border/50 shadow-lg">
+        <CardHeader className="border-b border-border/50 bg-gradient-to-b from-muted/30 to-muted/10">
+          <CardTitle className="text-lg">RFI List</CardTitle>
           <CardDescription>All project RFIs and their status</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {!rfis || rfis.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <Question size={48} className="text-muted-foreground mb-4" />
+            <div className="flex flex-col items-center justify-center py-16 text-center px-4">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted/30 mb-4">
+                <Question size={32} className="text-muted-foreground" weight="duotone" />
+              </div>
               <h3 className="text-lg font-semibold mb-2">No RFIs submitted</h3>
-              <p className="text-sm text-muted-foreground mb-4">
+              <p className="text-sm text-muted-foreground mb-6">
                 Create your first RFI to request information or clarification
               </p>
               <Button onClick={() => setIsCreateOpen(true)}>
@@ -402,7 +404,7 @@ export function RFIsPage() {
                   <TableHead>Submitted</TableHead>
                   <TableHead>Due Date</TableHead>
                   <TableHead>Days Open</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -411,56 +413,73 @@ export function RFIsPage() {
                   const daysOpen = Math.floor(
                     (new Date().getTime() - new Date(rfi.submittedDate).getTime()) / (1000 * 60 * 60 * 24)
                   )
+                  const isOverdue = daysOpen > 7
+                  const isCritical = daysOpen > 14
+                  
                   return (
-                    <TableRow key={rfi.id}>
-                      <TableCell className="font-medium font-mono">{rfi.number}</TableCell>
-                      <TableCell>
-                        <div className="font-medium">{rfi.subject}</div>
-                        <div className="text-sm text-muted-foreground line-clamp-1">{rfi.question}</div>
+                    <TableRow key={rfi.id} className={isCritical ? 'bg-destructive/5 hover:bg-destructive/10' : ''}>
+                      <TableCell className="font-semibold font-mono text-foreground">
+                        {rfi.number}
+                      </TableCell>
+                      <TableCell className="max-w-md">
+                        <div className="font-medium text-foreground truncate">{rfi.subject}</div>
+                        <div className="text-sm text-muted-foreground line-clamp-1 mt-0.5">{rfi.question}</div>
                       </TableCell>
                       <TableCell>
-                        <Badge className={getPriorityColor(rfi.priority)}>
+                        <Badge className={getPriorityColor(rfi.priority)} variant="default">
                           {rfi.priority}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={statusBadge.variant} className="gap-1">
+                        <Badge variant={statusBadge.variant} className="gap-1.5 font-medium">
                           {statusBadge.icon}
-                          {rfi.status}
+                          <span className="capitalize">{rfi.status}</span>
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <div className="text-sm">{new Date(rfi.submittedDate).toLocaleDateString()}</div>
-                        <div className="text-xs text-muted-foreground">{rfi.submittedBy}</div>
+                        <div className="text-sm font-medium">{new Date(rfi.submittedDate).toLocaleDateString()}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">{rfi.submittedBy}</div>
                       </TableCell>
                       <TableCell>
-                        {rfi.dueDate ? new Date(rfi.dueDate).toLocaleDateString() : '-'}
+                        <div className="text-sm">
+                          {rfi.dueDate ? new Date(rfi.dueDate).toLocaleDateString() : (
+                            <span className="text-muted-foreground">Not set</span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={daysOpen > 7 ? 'destructive' : 'outline'}>
+                        <Badge 
+                          variant={isCritical ? 'destructive' : isOverdue ? 'default' : 'outline'}
+                          className="font-semibold tabular-nums"
+                        >
                           {daysOpen}d
                         </Badge>
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
                           <Button 
                             variant="ghost" 
                             size="sm"
                             onClick={() => handleEdit(rfi)}
+                            className="hover:bg-accent/10"
                           >
                             <PencilSimple size={16} />
                           </Button>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                <Trash size={16} className="text-destructive" />
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                className="hover:bg-destructive/10 hover:text-destructive"
+                              >
+                                <Trash size={16} />
                               </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Delete RFI</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  Are you sure you want to delete "{rfi.number}"? This action cannot be undone.
+                                  Are you sure you want to delete RFI <strong>{rfi.number}</strong> - "{rfi.subject}"? This action cannot be undone.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>

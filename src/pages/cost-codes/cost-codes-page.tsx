@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { Plus, Tag, PencilSimple, Trash, Warning } from '@phosphor-icons/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
@@ -14,6 +15,7 @@ import { toast } from 'sonner'
 import { costCodesDb } from '@/lib/db'
 import type { CostCode } from '@/lib/types'
 import { triggerFinancialRollup } from '@/lib/services/financial-rollup'
+import { cn } from '@/lib/utils'
 
 export function CostCodesPage() {
   const { projectId } = useParams()
@@ -267,18 +269,21 @@ export function CostCodesPage() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Cost Codes</CardTitle>
+      <Card className="border-border/50 shadow-lg">
+        <CardHeader className="border-b border-border/50 bg-gradient-to-b from-muted/30 to-muted/10">
+          <CardTitle className="text-lg">Cost Codes</CardTitle>
           <CardDescription>All cost codes for this project</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {!costCodes || costCodes.length === 0 ? (
-            <div className="text-center py-12">
-              <Tag className="mx-auto text-muted-foreground mb-4" size={48} />
-              <p className="text-muted-foreground mb-4">No cost codes yet</p>
+            <div className="text-center py-16 px-4">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted/30 mb-4">
+                <Tag className="text-muted-foreground" size={32} weight="duotone" />
+              </div>
+              <h3 className="font-semibold text-lg mb-2">No cost codes yet</h3>
+              <p className="text-muted-foreground text-sm mb-6">Create your first cost code to start tracking project costs</p>
               <Button onClick={() => setIsCreateOpen(true)}>
-                <Plus className="mr-2" />
+                <Plus className="mr-2" size={16} />
                 Create First Cost Code
               </Button>
             </div>
@@ -292,38 +297,85 @@ export function CostCodesPage() {
                   <TableHead className="text-right">Budget</TableHead>
                   <TableHead className="text-right">Actual</TableHead>
                   <TableHead className="text-right">Variance</TableHead>
+                  <TableHead className="text-right">Progress</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {costCodes.map(code => {
                   const variance = (code.budgetAmount || 0) - (code.actualAmount || 0)
+                  const progress = code.budgetAmount ? ((code.actualAmount || 0) / code.budgetAmount) * 100 : 0
+                  const isOverBudget = variance < 0
+                  
                   return (
                     <TableRow key={code.id}>
-                      <TableCell className="font-medium font-mono">{code.code}</TableCell>
-                      <TableCell>{code.name}</TableCell>
-                      <TableCell className="capitalize">{code.category || 'N/A'}</TableCell>
-                      <TableCell className="text-right">${(code.budgetAmount || 0).toLocaleString()}</TableCell>
-                      <TableCell className="text-right">${(code.actualAmount || 0).toLocaleString()}</TableCell>
-                      <TableCell className={`text-right font-medium ${variance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        ${variance.toLocaleString()}
+                      <TableCell className="font-semibold font-mono text-foreground">
+                        {code.code}
+                      </TableCell>
+                      <TableCell className="max-w-xs">
+                        <div className="truncate font-medium">{code.name}</div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="capitalize font-medium">
+                          {code.category || 'N/A'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-medium tabular-nums">
+                        ${(code.budgetAmount || 0).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right font-medium tabular-nums">
+                        ${(code.actualAmount || 0).toLocaleString()}
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => handleEdit(code)}>
-                            <PencilSimple />
+                        <div className={cn(
+                          'inline-flex items-center gap-1 font-semibold tabular-nums',
+                          isOverBudget ? 'text-destructive' : 'text-success'
+                        )}>
+                          <span>{isOverBudget ? '-' : '+'}</span>
+                          <span>${Math.abs(variance).toLocaleString()}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <div className="w-20 h-1.5 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className={cn(
+                                'h-full rounded-full transition-all',
+                                progress >= 100 ? 'bg-destructive' : 'bg-accent'
+                              )}
+                              style={{ width: `${Math.min(progress, 100)}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-muted-foreground tabular-nums w-10 text-right">
+                            {progress.toFixed(0)}%
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => handleEdit(code)}
+                            className="hover:bg-accent/10"
+                          >
+                            <PencilSimple size={16} />
                           </Button>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                <Trash />
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                className="hover:bg-destructive/10 hover:text-destructive"
+                              >
+                                <Trash size={16} />
                               </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Delete Cost Code</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  Are you sure? This action cannot be undone.
+                                  Are you sure you want to delete cost code <strong>{code.code}</strong>? This action cannot be undone.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
