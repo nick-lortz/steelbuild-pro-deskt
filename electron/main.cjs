@@ -786,7 +786,7 @@ ipcMain.handle("db:listContracts", async (event, projectId, options) => {
   }
 });
 
-ipcMain.handle("db:updateContract", async (event, data) => {
+ipcMain.handle("db:updateContract", async (event, id, data) => {
   try {
     return await updateContract(id, data);
   } catch (error) {

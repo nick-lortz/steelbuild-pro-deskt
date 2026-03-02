@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Plus, Tag, PencilSimple, Trash } from '@phosphor-icons/react'
+import { Plus, Tag, PencilSimple, Trash, Warning } from '@phosphor-icons/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -9,116 +9,117 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
-import { costCodesDb } from '@/lib/db'
-import type { CostCode } from '@/lib/types'
+import { useCostCodes } from '@/hooks/use-database'
 
 export function CostCodesPage() {
   const { projectId } = useParams()
-  const [costCodes, setCostCodes] = useState<CostCode[]>([])
-  const [loading, setLoading] = useState(true)
+  const { costCodes, loading, error, createCostCode, updateCostCode, deleteCostCode } = useCostCodes(projectId)
+  
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
-  const [editingCode, setEditingCode] = useState<CostCode | null>(null)
+  const [editingCode, setEditingCode] = useState<any>(null)
   const [formData, setFormData] = useState({
     code: '',
-    name: '',
-    category: 'labor' as CostCode['category'],
-    budgetAmount: '',
+    description: '',
+    category: 'labor',
+    budget_amount: '',
   })
 
-  const loadCostCodes = async () => {
-    if (!projectId) return
-    setLoading(true)
-    try {
-      const projectCostCodes = await costCodesDb.getByProject(projectId)
-      setCostCodes(projectCostCodes)
-    } catch (error) {
-      console.error('Failed to load cost codes:', error)
-      toast.error('Failed to load cost codes')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    loadCostCodes()
-  }, [projectId])
-
-  const totalBudget = costCodes.reduce((sum, cc) => sum + (cc.budgetAmount || 0), 0)
-  const totalActual = costCodes.reduce((sum, cc) => sum + (cc.actualAmount || 0), 0)
+  const totalBudget = costCodes.reduce((sum, cc) => sum + (cc.budget_amount || 0), 0)
+  const totalActual = costCodes.reduce((sum, cc) => sum + (cc.actual_amount || 0), 0)
 
   const handleCreate = async () => {
-    if (!formData.code || !formData.name) {
-      toast.error('Please fill in required fields')
+    if (!formData.code || !formData.description) {
+      toast.error('Please fill in code and description')
       return
     }
 
-    try {
-      await costCodesDb.create({
-        code: formData.code,
-        name: formData.name,
-        category: formData.category,
-        projectId,
-        budgetAmount: formData.budgetAmount ? parseFloat(formData.budgetAmount) : undefined,
-        actualAmount: 0,
-      })
+    const result = await createCostCode({
+      code: formData.code,
+      description: formData.description,
+      category: formData.category,
+      budget_amount: formData.budget_amount ? parseFloat(formData.budget_amount) : 0,
+      actual_amount: 0,
+    })
 
-      await loadCostCodes()
+    if (result.success) {
       setIsCreateOpen(false)
-      setFormData({ code: '', name: '', category: 'labor', budgetAmount: '' })
+      setFormData({ code: '', description: '', category: 'labor', budget_amount: '' })
       toast.success('Cost code created')
-    } catch (error: any) {
-      console.error('Failed to create cost code:', error)
-      toast.error(error.message || 'Failed to create cost code')
+    } else {
+      toast.error(result.error || 'Failed to create cost code')
     }
   }
 
-  const handleEdit = (code: CostCode) => {
+  const handleEdit = (code: any) => {
     setEditingCode(code)
     setFormData({
       code: code.code,
-      name: code.name,
-      category: code.category,
-      budgetAmount: code.budgetAmount?.toString() || '',
+      description: code.description,
+      category: code.category || 'labor',
+      budget_amount: code.budget_amount?.toString() || '',
     })
     setIsEditOpen(true)
   }
 
   const handleUpdate = async () => {
-    if (!formData.code || !formData.name || !editingCode) {
-      toast.error('Please fill in required fields')
+    if (!formData.code || !formData.description || !editingCode) {
+      toast.error('Please fill in code and description')
       return
     }
 
-    try {
-      await costCodesDb.update(editingCode.id, {
-        code: formData.code,
-        name: formData.name,
-        category: formData.category,
-        budgetAmount: formData.budgetAmount ? parseFloat(formData.budgetAmount) : undefined,
-      })
+    const result = await updateCostCode(editingCode.id, {
+      code: formData.code,
+      description: formData.description,
+      category: formData.category,
+      budget_amount: formData.budget_amount ? parseFloat(formData.budget_amount) : 0,
+    })
 
-      await loadCostCodes()
+    if (result.success) {
       setIsEditOpen(false)
       setEditingCode(null)
-      setFormData({ code: '', name: '', category: 'labor', budgetAmount: '' })
+      setFormData({ code: '', description: '', category: 'labor', budget_amount: '' })
       toast.success('Cost code updated')
-    } catch (error: any) {
-      console.error('Failed to update cost code:', error)
-      toast.error(error.message || 'Failed to update cost code')
+    } else {
+      toast.error(result.error || 'Failed to update cost code')
     }
   }
 
   const handleDelete = async (codeId: string) => {
-    try {
-      await costCodesDb.delete(codeId)
-      await loadCostCodes()
+    const result = await deleteCostCode(codeId)
+    if (result.success) {
       toast.success('Cost code deleted')
-    } catch (error: any) {
-      console.error('Failed to delete cost code:', error)
-      toast.error(error.message || 'Failed to delete cost code')
+    } else {
+      toast.error(result.error || 'Failed to delete cost code')
     }
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 space-y-4">
+        <Warning size={64} className="text-destructive" />
+        <div className="text-center space-y-2">
+          <h3 className="font-semibold text-lg">Failed to load cost codes</h3>
+          <p className="text-sm text-muted-foreground">{error}</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-16 w-full" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
+        </div>
+        <Skeleton className="h-96 w-full" />
+      </div>
+    )
   }
 
   return (
@@ -182,8 +183,8 @@ export function CostCodesPage() {
                   id="budget"
                   type="number"
                   step="0.01"
-                  value={formData.budgetAmount}
-                  onChange={e => setFormData(prev => ({ ...prev, budgetAmount: e.target.value }))}
+                  value={formData.budget_amount}
+                  onChange={e => setFormData(prev => ({ ...prev, budget_amount: e.target.value }))}
                   placeholder="0.00"
                 />
               </div>
@@ -246,7 +247,7 @@ export function CostCodesPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Code</TableHead>
-                  <TableHead>Name</TableHead>
+                  <TableHead>Description</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead className="text-right">Budget</TableHead>
                   <TableHead className="text-right">Actual</TableHead>
@@ -256,14 +257,14 @@ export function CostCodesPage() {
               </TableHeader>
               <TableBody>
                 {costCodes.map(code => {
-                  const variance = (code.budgetAmount || 0) - (code.actualAmount || 0)
+                  const variance = (code.budget_amount || 0) - (code.actual_amount || 0)
                   return (
                     <TableRow key={code.id}>
                       <TableCell className="font-medium font-mono">{code.code}</TableCell>
-                      <TableCell>{code.name}</TableCell>
-                      <TableCell className="capitalize">{code.category}</TableCell>
-                      <TableCell className="text-right">${(code.budgetAmount || 0).toLocaleString()}</TableCell>
-                      <TableCell className="text-right">${(code.actualAmount || 0).toLocaleString()}</TableCell>
+                      <TableCell>{code.description}</TableCell>
+                      <TableCell className="capitalize">{code.category || 'N/A'}</TableCell>
+                      <TableCell className="text-right">${(code.budget_amount || 0).toLocaleString()}</TableCell>
+                      <TableCell className="text-right">${(code.actual_amount || 0).toLocaleString()}</TableCell>
                       <TableCell className={`text-right font-medium ${variance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                         ${variance.toLocaleString()}
                       </TableCell>
@@ -335,11 +336,11 @@ export function CostCodesPage() {
               </div>
             </div>
             <div>
-              <Label htmlFor="edit-name">Name</Label>
+              <Label htmlFor="edit-description">Description</Label>
               <Input
-                id="edit-name"
-                value={formData.name}
-                onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                id="edit-description"
+                value={formData.description}
+                onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
               />
             </div>
             <div>
@@ -348,8 +349,8 @@ export function CostCodesPage() {
                 id="edit-budget"
                 type="number"
                 step="0.01"
-                value={formData.budgetAmount}
-                onChange={e => setFormData(prev => ({ ...prev, budgetAmount: e.target.value }))}
+                value={formData.budget_amount}
+                onChange={e => setFormData(prev => ({ ...prev, budget_amount: e.target.value }))}
               />
             </div>
             <Button onClick={handleUpdate} className="w-full">Update Cost Code</Button>
