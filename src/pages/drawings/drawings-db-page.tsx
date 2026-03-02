@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   Plus,
@@ -7,6 +7,8 @@ import {
   Upload,
   Check,
   X,
+  FilePdf,
+  Eye,
 } from '@phosphor-icons/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -38,6 +40,8 @@ interface DrawingSheet {
   sheet_no: string
   title: string
   status: DrawingSetStatus
+  file_name?: string
+  file_data?: string
   created_at: string
 }
 
@@ -68,6 +72,9 @@ export function DrawingsDBPage() {
   const [isAddSheetOpen, setIsAddSheetOpen] = useState(false)
   const [selectedSet, setSelectedSet] = useState<DrawingSet | null>(null)
   const [viewSheetsSetId, setViewSheetsSetId] = useState<string | null>(null)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [uploadingFile, setUploadingFile] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [setFormData, setSetFormData] = useState({
     name: '',
@@ -116,30 +123,101 @@ export function DrawingsDBPage() {
     toast.success('Drawing set created successfully')
   }
 
-  const handleAddSheet = () => {
+  const handleAddSheet = async () => {
     if (!selectedSet || !sheetFormData.sheet_no || !sheetFormData.title) {
       toast.error('Please fill in required fields')
       return
     }
 
-    const newSheet: DrawingSheet = {
-      id: crypto.randomUUID(),
-      set_id: selectedSet.id,
-      sheet_no: sheetFormData.sheet_no,
-      title: sheetFormData.title,
-      status: sheetFormData.status,
-      created_at: new Date().toISOString(),
+    if (!selectedFile) {
+      toast.error('Please select a PDF file to upload')
+      return
     }
 
-    setDrawingSheets((current) => [...current, newSheet])
-    setIsAddSheetOpen(false)
-    setSelectedSet(null)
-    setSheetFormData({
-      sheet_no: '',
-      title: '',
-      status: 'IFA',
-    })
-    toast.success('Sheet added successfully')
+    if (!selectedFile.name.toLowerCase().endsWith('.pdf')) {
+      toast.error('Only PDF files are supported')
+      return
+    }
+
+    setUploadingFile(true)
+
+    try {
+      const reader = new FileReader()
+      reader.onload = async (e) => {
+        if (e.target?.result) {
+          const base64Data = btoa(
+            new Uint8Array(e.target.result as ArrayBuffer)
+              .reduce((data, byte) => data + String.fromCharCode(byte), '')
+          )
+
+          const newSheet: DrawingSheet = {
+            id: crypto.randomUUID(),
+            set_id: selectedSet.id,
+            sheet_no: sheetFormData.sheet_no,
+            title: sheetFormData.title,
+            status: sheetFormData.status,
+            file_name: selectedFile.name,
+            file_data: base64Data,
+            created_at: new Date().toISOString(),
+          }
+
+          setDrawingSheets((current) => [...current, newSheet])
+          setIsAddSheetOpen(false)
+          setSelectedSet(null)
+          setSelectedFile(null)
+          setSheetFormData({
+            sheet_no: '',
+            title: '',
+            status: 'IFA',
+          })
+          setUploadingFile(false)
+          toast.success('Sheet added successfully with PDF file')
+        }
+      }
+
+      reader.onerror = () => {
+        setUploadingFile(false)
+        toast.error('Failed to read file')
+      }
+
+      reader.readAsArrayBuffer(selectedFile)
+    } catch (error) {
+      setUploadingFile(false)
+      toast.error('Failed to upload file')
+    }
+  }
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      if (!file.name.toLowerCase().endsWith('.pdf')) {
+        toast.error('Only PDF files are supported')
+        return
+      }
+      setSelectedFile(file)
+      toast.success(`Selected: ${file.name}`)
+    }
+  }
+
+  const handleViewPDF = (sheet: DrawingSheet) => {
+    if (!sheet.file_data) {
+      toast.error('No PDF file attached to this sheet')
+      return
+    }
+
+    try {
+      const byteCharacters = atob(sheet.file_data)
+      const byteNumbers = new Array(byteCharacters.length)
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i)
+      }
+      const byteArray = new Uint8Array(byteNumbers)
+      const blob = new Blob([byteArray], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank')
+    } catch (error) {
+      toast.error('Failed to open PDF file')
+    }
   }
 
   const handleStatusChange = (setId: string, currentStatus: DrawingSetStatus) => {
@@ -450,6 +528,7 @@ export function DrawingsDBPage() {
                         <TableHead>Sheet No.</TableHead>
                         <TableHead>Title</TableHead>
                         <TableHead>Drawing Set</TableHead>
+                        <TableHead>PDF</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Created</TableHead>
                         <TableHead>Actions</TableHead>
@@ -464,6 +543,25 @@ export function DrawingsDBPage() {
                             <TableCell>{sheet.title}</TableCell>
                             <TableCell className="text-sm text-muted-foreground">
                               {set?.name || 'Unknown'}
+                            </TableCell>
+                            <TableCell>
+                              {sheet.file_name ? (
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline" className="flex items-center gap-1">
+                                    <FilePdf size={12} />
+                                    {sheet.file_name}
+                                  </Badge>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleViewPDF(sheet)}
+                                  >
+                                    <Eye size={14} />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">No file</span>
+                              )}
                             </TableCell>
                             <TableCell>
                               <Badge variant={STATUS_COLORS[sheet.status]}>
@@ -522,6 +620,28 @@ export function DrawingsDBPage() {
               />
             </div>
             <div className="grid gap-2">
+              <Label htmlFor="pdf-upload">PDF File *</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="pdf-upload"
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,application/pdf"
+                  onChange={handleFileSelect}
+                  className="cursor-pointer"
+                />
+                {selectedFile && (
+                  <Badge variant="secondary" className="flex items-center gap-1">
+                    <FilePdf size={14} />
+                    {selectedFile.name}
+                  </Badge>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Upload a PDF file for this drawing sheet
+              </p>
+            </div>
+            <div className="grid gap-2">
               <Label htmlFor="sheet-status">Initial Status</Label>
               <Select 
                 value={sheetFormData.status} 
@@ -545,12 +665,14 @@ export function DrawingsDBPage() {
               variant="outline" 
               onClick={() => {
                 setIsAddSheetOpen(false)
+                setSelectedFile(null)
               }}
+              disabled={uploadingFile}
             >
               Cancel
             </Button>
-            <Button onClick={handleAddSheet}>
-              Add Sheet
+            <Button onClick={handleAddSheet} disabled={uploadingFile}>
+              {uploadingFile ? 'Uploading...' : 'Add Sheet'}
             </Button>
           </div>
         </DialogContent>
