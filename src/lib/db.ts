@@ -12,6 +12,7 @@ import type {
   Checklist,
   RFI,
   EquipmentLog,
+  Task,
 } from './types'
 
 const KV_KEYS = {
@@ -25,6 +26,7 @@ const KV_KEYS = {
   CHECKLISTS: 'checklists',
   RFIS: 'rfis',
   EQUIPMENT_LOGS: 'equipmentLogs',
+  TASKS: 'tasks',
 }
 
 export const projectsDb = {
@@ -460,6 +462,53 @@ export const equipmentLogsDb = {
     await spark.kv.set(
       KV_KEYS.EQUIPMENT_LOGS,
       logs.filter((l) => l.id !== id)
+    )
+  },
+}
+
+export const tasksDb = {
+  async getAll(): Promise<Task[]> {
+    const tasks = await spark.kv.get<Task[]>(KV_KEYS.TASKS)
+    return tasks || []
+  },
+
+  async getByProject(projectId: string): Promise<Task[]> {
+    const tasks = await this.getAll()
+    return tasks.filter((t) => t.projectId === projectId)
+  },
+
+  async getById(id: string): Promise<Task | undefined> {
+    const tasks = await this.getAll()
+    return tasks.find((t) => t.id === id)
+  },
+
+  async create(task: Omit<Task, 'id' | 'createdAt'>): Promise<Task> {
+    const tasks = await this.getAll()
+    const newTask: Task = {
+      ...task,
+      id: crypto.randomUUID(),
+      createdAt: new Date().toISOString(),
+    }
+    await spark.kv.set(KV_KEYS.TASKS, [...tasks, newTask])
+    return newTask
+  },
+
+  async update(id: string, updates: Partial<Task>): Promise<Task> {
+    const tasks = await this.getAll()
+    const index = tasks.findIndex((t) => t.id === id)
+    if (index === -1) throw new Error('Task not found')
+    
+    const updated = { ...tasks[index], ...updates, id }
+    tasks[index] = updated
+    await spark.kv.set(KV_KEYS.TASKS, tasks)
+    return updated
+  },
+
+  async delete(id: string): Promise<void> {
+    const tasks = await this.getAll()
+    await spark.kv.set(
+      KV_KEYS.TASKS,
+      tasks.filter((t) => t.id !== id)
     )
   },
 }
