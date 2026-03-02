@@ -78,6 +78,65 @@ export function SOVTrackingPage() {
     ? ((totals.totalCompleted / totals.scheduledValue) * 100).toFixed(2)
     : '0.00'
 
+  const handleAutoGenerateSOV = async () => {
+    if (!projectId) {
+      toast.error('No project selected')
+      return
+    }
+
+    if (!versionForm.periodStart || !versionForm.periodEnd) {
+      toast.error('Please select period start and end dates')
+      return
+    }
+
+    setGenerating(true)
+    try {
+      const sovData = await generateSOVFromCostCodes(
+        {
+          projectId,
+          periodStart: versionForm.periodStart,
+          periodEnd: versionForm.periodEnd,
+          retainagePercent: 10,
+          includeMaterialsStored: true,
+        },
+        budgets || [],
+        costCodes || [],
+        tasks || [],
+        workPackages || []
+      )
+
+      const versionId = crypto.randomUUID()
+      const newVersion: SOVVersion = {
+        ...sovData.version,
+        id: versionId,
+        versionNumber: (sovVersions?.length || 0) + 1,
+        createdAt: new Date().toISOString(),
+      }
+
+      const itemsWithIds = sovData.items.map(item => ({
+        ...item,
+        id: crypto.randomUUID(),
+        versionId,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }))
+
+      setSOVVersions(current => [...(current || []), newVersion])
+      setSOVItems(current => [...(current || []), ...itemsWithIds])
+      setSelectedVersion(versionId)
+
+      toast.success(
+        `SOV generated successfully: ${sovData.summary.itemCount} line items totaling $${sovData.summary.totalScheduledValue.toLocaleString()}`
+      )
+      setIsAutoGenerateOpen(false)
+    } catch (error) {
+      console.error('Failed to generate SOV:', error)
+      toast.error('Failed to generate SOV')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
   const handleCreateVersion = () => {
     if (!versionForm.periodStart || !versionForm.periodEnd) {
       toast.error('Please fill in required fields')

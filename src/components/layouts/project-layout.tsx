@@ -25,6 +25,7 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { projectsDb } from '@/lib/db'
 import { PMAPanel } from '@/components/pma/pma-panel'
+import { PMANotificationBadge } from '@/components/pma/pma-notification-badge'
 import { PageTransition } from '@/components/shared/page-transition'
 import type { Project } from '@/lib/types'
 
@@ -74,6 +75,7 @@ export function ProjectLayout() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <PMANotificationBadge projectId={projectId} onOpen={() => setPmaOpen(true)} />
           <Button variant="default" size="sm" className="gap-2" onClick={() => setPmaOpen(true)}>
             <Robot size={18} />
             PMA

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Buildings, CurrencyDollar, Wrench, ListChecks, Plus, Warning, FileText, Calendar, TrendUp, CheckCircle } from '@phosphor-icons/react'
+import { Buildings, CurrencyDollar, Wrench, ListChecks, Plus, Warning, FileText, Calendar, TrendUp, CheckCircle, ArrowsClockwise } from '@phosphor-icons/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -11,7 +11,7 @@ import { useDatabase } from '@/hooks/use-database'
 import type { Project, Equipment, Checklist, RFI, Task, Alert as AlertType, Submittal } from '@/lib/types'
 
 export function DashboardPage() {
-  const { isDesktop } = useDatabase()
+  const { isDesktop, db } = useDatabase()
   const [projects, setProjects] = useState<Project[]>([])
   const [equipment, setEquipment] = useState<Equipment[]>([])
   const [checklists, setChecklists] = useState<Checklist[]>([])
@@ -20,22 +20,41 @@ export function DashboardPage() {
   const [alerts] = useKV<AlertType[]>('alerts', [])
   const [submittals] = useKV<Submittal[]>('submittals', [])
   const [refreshKey, setRefreshKey] = useState(0)
+  const [syncing, setSyncing] = useState(false)
+  const [financialSummary, setFinancialSummary] = useState<{
+    totalContractValue: number
+    totalBudget: number
+    totalActual: number
+    margin: number
+  } | null>(null)
 
   useEffect(() => {
     const loadData = async () => {
-      const [p, e, c, r] = await Promise.all([
-        projectsDb.getAll(),
-        equipmentDb.getAll(),
-        checklistsDb.getAll(),
-        rfisDb.getAll(),
-      ])
-      setProjects(p)
-      setEquipment(e)
-      setChecklists(c)
-      setRfis(r)
+      setSyncing(true)
+      try {
+        const [p, e, c, r] = await Promise.all([
+          projectsDb.getAll(),
+          equipmentDb.getAll(),
+          checklistsDb.getAll(),
+          rfisDb.getAll(),
+        ])
+        setProjects(p)
+        setEquipment(e)
+        setChecklists(c)
+        setRfis(r)
+
+        if (isDesktop && p.length > 0) {
+          const totalResult = await db.recalculateProjectTotals(p[0].id)
+          if (totalResult.success && totalResult.data) {
+            setFinancialSummary(totalResult.data)
+          }
+        }
+      } finally {
+        setTimeout(() => setSyncing(false), 500)
+      }
     }
     loadData()
-  }, [refreshKey])
+  }, [refreshKey, isDesktop, db])
 
   useEffect(() => {
     const handleDataChange = () => {
@@ -47,7 +66,7 @@ export function DashboardPage() {
   }, [])
 
   const activeProjects = projects.filter((p) => p.status === 'active')
-  const totalContractValue = projects.reduce((sum, p) => sum + p.contractValue, 0)
+  const totalContractValue = financialSummary?.totalContractValue ?? projects.reduce((sum, p) => sum + p.contractValue, 0)
   const pendingChecklists = checklists.filter((c) => c.status !== 'completed')
   
   const criticalAlerts = alerts.filter(a => a.severity === 'critical' && !a.dismissed).length
@@ -70,6 +89,12 @@ export function DashboardPage() {
             Overview of your steel fabrication projects and operations
           </p>
         </div>
+        {syncing && (
+          <Badge variant="secondary" className="gap-2 animate-pulse">
+            <ArrowsClockwise className="w-3.5 h-3.5 animate-spin" />
+            Syncing...
+          </Badge>
+        )}
       </div>
 
       {criticalAlerts > 0 && (
