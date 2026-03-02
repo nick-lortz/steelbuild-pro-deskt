@@ -713,6 +713,53 @@ async function generatePMAInsights(projectId) {
     }
   }
   
+  const budgetVarianceWithTasks = sqliteDb.prepare(`
+    SELECT cc.*, t.percent_complete 
+    FROM cost_codes cc
+    LEFT JOIN tasks t ON cc.cost_code_id = t.id
+    WHERE cc.project_id = ? 
+      AND cc.deleted_at IS NULL
+      AND cc.budget_amount > 0
+      AND cc.actual_amount > (cc.budget_amount * 0.90)
+      AND (t.percent_complete IS NULL OR t.percent_complete < 90)
+  `).all(projectId);
+  
+  for (const item of budgetVarianceWithTasks) {
+    const percentUsed = ((item.actual_amount / item.budget_amount) * 100).toFixed(1);
+    const taskProgress = item.percent_complete || 0;
+    
+    const insight = {
+      project_id: projectId,
+      severity: 'high',
+      type: 'budget-variance-early',
+      title: `Cost Code ${item.code} is ${percentUsed}% spent but only ${taskProgress}% complete`,
+      details: `This cost code has consumed ${percentUsed}% of budget ($${item.actual_amount.toFixed(2)} / $${item.budget_amount.toFixed(2)}) while associated work is only ${taskProgress}% complete. This indicates potential budget overrun risk.`,
+      entity_refs: [
+        {
+          entity_type: 'cost_code',
+          entity_id: item.id,
+          label: `Cost Code ${item.code}`,
+          link: `/projects/${projectId}/cost-codes?code=${item.id}`
+        }
+      ]
+    };
+    
+    const existing = sqliteDb.prepare(`
+      SELECT id FROM pma_insights 
+      WHERE project_id = ? 
+        AND type = 'budget-variance-early' 
+        AND entity_refs_json LIKE ?
+        AND status = 'open'
+    `).get(projectId, `%"entity_id":"${item.id}"%`);
+    
+    if (!existing) {
+      const result = await createPMAInsight(insight);
+      if (result.success) {
+        insights.push(result.data);
+      }
+    }
+  }
+  
   return { success: true, data: insights };
 }
 
