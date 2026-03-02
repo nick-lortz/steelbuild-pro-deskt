@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
-import { Plus, Download, FileText, CheckCircle, Clock, XCircle, Sparkle } from '@phosphor-icons/react'
+import { Plus, Download, FileText, CheckCircle, Clock, XCircle, Sparkle, ArrowsClockwise, ChartLine } from '@phosphor-icons/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -11,9 +11,12 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Progress } from '@/components/ui/progress'
 import { useKV } from '@github/spark/hooks'
 import { toast } from 'sonner'
 import { generateSOVFromCostCodes } from '@/lib/functions/sov-generation'
+import { calculateAutomatedSOV, exportSOVToG702Format, validateSOVTotals, type AutomatedSOVResult } from '@/lib/services/automated-sov'
 import type { SOVItem, SOVVersion, Budget, CostCode, Task, WorkPackage } from '@/lib/types'
 
 export function SOVTrackingPage() {
@@ -29,12 +32,15 @@ export function SOVTrackingPage() {
   const [isAutoGenerateOpen, setIsAutoGenerateOpen] = useState(false)
   const [selectedVersion, setSelectedVersion] = useState<string | null>(null)
   const [generating, setGenerating] = useState(false)
+  const [automatedSOV, setAutomatedSOV] = useState<AutomatedSOVResult | null>(null)
+  const [sovValidation, setSovValidation] = useState<{ isValid: boolean; errors: string[]; warnings: string[] } | null>(null)
   
   const [versionForm, setVersionForm] = useState({
     periodStart: '',
     periodEnd: '',
     status: 'draft' as SOVVersion['status'],
     notes: '',
+    retainagePercent: '10',
   })
 
   const [itemForm, setItemForm] = useState({
@@ -134,6 +140,63 @@ export function SOVTrackingPage() {
       toast.error('Failed to generate SOV')
     } finally {
       setGenerating(false)
+    }
+  }
+
+  const handleGenerateAutomatedSOV = async () => {
+    if (!projectId) {
+      toast.error('No project selected')
+      return
+    }
+
+    setGenerating(true)
+    try {
+      const retainagePercent = parseFloat(versionForm.retainagePercent || '10')
+      const result = await calculateAutomatedSOV(projectId, retainagePercent)
+      
+      setAutomatedSOV(result)
+      
+      const validation = validateSOVTotals(result)
+      setSovValidation(validation)
+      
+      if (!validation.isValid) {
+        toast.error(`SOV validation failed with ${validation.errors.length} error(s)`)
+      } else if (validation.warnings.length > 0) {
+        toast.warning(`SOV generated with ${validation.warnings.length} warning(s)`)
+      } else {
+        toast.success(`Automated SOV generated: ${result.items.length} items, $${result.summary.netDueThisPeriod.toLocaleString()} net due`)
+      }
+    } catch (error) {
+      console.error('Failed to generate automated SOV:', error)
+      toast.error('Failed to generate automated SOV')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  const handleExportAutomatedSOV = async () => {
+    if (!automatedSOV) {
+      toast.error('No automated SOV to export')
+      return
+    }
+
+    try {
+      const exportText = await exportSOVToG702Format(automatedSOV)
+      
+      const blob = new Blob([exportText], { type: 'text/plain' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `SOV-${automatedSOV.projectId}-${automatedSOV.period.replace(/\s+/g, '-')}.txt`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      
+      toast.success('SOV exported successfully')
+    } catch (error) {
+      console.error('Failed to export SOV:', error)
+      toast.error('Failed to export SOV')
     }
   }
 

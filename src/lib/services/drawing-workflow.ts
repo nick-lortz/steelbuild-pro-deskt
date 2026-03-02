@@ -76,16 +76,23 @@ export function getNextAvailableStatuses(currentStatus: DrawingStatus): DrawingS
 
 export function canEdit(status: DrawingStatus, userRole: string = 'user'): boolean {
   if (status === 'FFF') {
-    return userRole === 'project_manager' || userRole === 'admin'
+    return userRole === 'project_manager' || userRole === 'admin' || userRole === 'owner'
   }
   return true
 }
 
 export function canDelete(status: DrawingStatus, userRole: string = 'user'): boolean {
   if (status === 'FFF') {
-    return userRole === 'project_manager' || userRole === 'admin'
+    return userRole === 'project_manager' || userRole === 'admin' || userRole === 'owner'
   }
   return true
+}
+
+export function getActionRestrictionMessage(status: DrawingStatus, action: 'edit' | 'delete'): string | null {
+  if (status === 'FFF') {
+    return `Cannot ${action} FFF (Final for Fabrication) drawings. This prevents accidental shop-floor errors that cost thousands in wasted steel. Contact your Project Manager or Admin if changes are required.`
+  }
+  return null
 }
 
 export interface StatusValidationResult {

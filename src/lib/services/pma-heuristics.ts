@@ -1,5 +1,5 @@
-import { rfisDb, costCodesDb, projectsDb } from '../db'
-import type { RFI, CostCode, Project } from '../types'
+import { rfisDb, costCodesDb, projectsDb, tasksDb } from '../db'
+import type { RFI, CostCode, Project, Task } from '../types'
 
 export interface PMAInsight {
   id: string
@@ -66,7 +66,7 @@ export async function scanStaleRFIs(projectId: string, thresholds = DEFAULT_THRE
   const rfis = await rfisDb.getByProject(projectId)
   const insights: PMAInsight[] = []
   
-  const openRFIs = rfis.filter(r => r.status === 'open')
+  const openRFIs = rfis.filter(r => r.status === 'open' || r.status === 'submitted' || r.status === 'in_review')
   
   for (const rfi of openRFIs) {
     const ageHours = calculateRFIAge(rfi.createdAt)
@@ -74,15 +74,25 @@ export async function scanStaleRFIs(projectId: string, thresholds = DEFAULT_THRE
     let shouldFlag = false
     let thresholdHours = 0
     
-    if (rfi.priority === 'high' && ageHours > thresholds.highPriority) {
+    if (ageHours > 72) {
       shouldFlag = true
-      thresholdHours = thresholds.highPriority
-    } else if (rfi.priority === 'medium' && ageHours > thresholds.mediumPriority) {
-      shouldFlag = true
-      thresholdHours = thresholds.mediumPriority
-    } else if (rfi.priority === 'low' && ageHours > thresholds.lowPriority) {
-      shouldFlag = true
-      thresholdHours = thresholds.lowPriority
+      thresholdHours = 72
+      
+      if (rfi.priority === 'high') {
+        thresholdHours = thresholds.highPriority
+      } else if (rfi.priority === 'medium') {
+        thresholdHours = thresholds.mediumPriority
+      } else if (rfi.priority === 'low') {
+        thresholdHours = thresholds.lowPriority
+      }
+      
+      if (rfi.priority === 'high' && ageHours > thresholds.highPriority) {
+        shouldFlag = true
+      } else if (rfi.priority === 'medium' && ageHours > thresholds.mediumPriority) {
+        shouldFlag = true
+      } else if (rfi.priority === 'low' && ageHours > thresholds.lowPriority) {
+        shouldFlag = true
+      }
     }
     
     if (shouldFlag) {
@@ -94,8 +104,8 @@ export async function scanStaleRFIs(projectId: string, thresholds = DEFAULT_THRE
         projectId,
         type: 'rfi-aging',
         severity,
-        title: `RFI #${rfi.number} is overdue`,
-        description: `RFI "${rfi.subject}" has been open for ${ageDays} day${ageDays !== 1 ? 's' : ''} (${ageHours} hours) with ${rfi.priority} priority. Threshold: ${Math.floor(thresholdHours / 24)} days.`,
+        title: `RFI #${rfi.number} is overdue (${ageDays}d)`,
+        description: `RFI "${rfi.subject}" has been open for ${ageDays} day${ageDays !== 1 ? 's' : ''} (${ageHours} hours) with ${rfi.priority || 'normal'} priority. Threshold: ${Math.floor(thresholdHours / 24)} days.`,
         actionable: `Review and respond to RFI #${rfi.number}. ${rfi.priority === 'high' ? 'This is blocking critical path work.' : 'This may be delaying downstream activities.'}`,
         entityType: 'rfi',
         entityId: rfi.id,
@@ -105,7 +115,7 @@ export async function scanStaleRFIs(projectId: string, thresholds = DEFAULT_THRE
         metadata: {
           rfiNumber: rfi.number,
           rfiSubject: rfi.subject,
-          rfiPriority: rfi.priority,
+          rfiPriority: rfi.priority || 'normal',
           ageHours,
           ageDays,
           thresholdHours,
@@ -162,13 +172,64 @@ export async function scanBudgetOverruns(projectId: string): Promise<PMAInsight[
   return insights
 }
 
+export async function scanScheduleSlippage(projectId: string): Promise<PMAInsight[]> {
+  const tasks = await tasksDb.getByProject(projectId)
+  const insights: PMAInsight[] = []
+  
+  const today = new Date()
+  
+  for (const task of tasks) {
+    if (task.status === 'completed') continue
+    
+    const hasBaseline = task.baselineEndDate && task.endDate
+    if (!hasBaseline) continue
+    
+    const baselineDate = new Date(task.baselineEndDate)
+    const currentDate = new Date(task.endDate)
+    
+    if (currentDate > baselineDate) {
+      const slippageDays = Math.ceil((currentDate.getTime() - baselineDate.getTime()) / (1000 * 60 * 60 * 24))
+      
+      let severity: PMAInsight['severity'] = 'low'
+      if (slippageDays > 14) severity = 'critical'
+      else if (slippageDays > 7) severity = 'high'
+      else if (slippageDays > 3) severity = 'medium'
+      
+      insights.push({
+        id: crypto.randomUUID(),
+        projectId,
+        type: 'schedule-slip',
+        severity,
+        title: `Task "${task.name}" is ${slippageDays}d behind baseline`,
+        description: `Task end date has slipped from ${baselineDate.toLocaleDateString()} to ${currentDate.toLocaleDateString()} (${slippageDays} day${slippageDays !== 1 ? 's' : ''} delay). Current completion: ${task.percentComplete || 0}%.`,
+        actionable: `Review task dependencies and resource allocation for "${task.name}". Update schedule or accelerate to recover baseline dates.`,
+        entityType: 'task',
+        entityId: task.id,
+        deepLink: `/projects/${projectId}/schedule?highlight=${task.id}`,
+        createdAt: new Date().toISOString(),
+        status: 'open',
+        metadata: {
+          taskName: task.name,
+          baselineEndDate: task.baselineEndDate,
+          currentEndDate: task.endDate,
+          slippageDays,
+          percentComplete: task.percentComplete || 0,
+        },
+      })
+    }
+  }
+  
+  return insights
+}
+
 export async function generateProjectInsights(projectId: string, thresholds = DEFAULT_THRESHOLDS): Promise<PMAInsight[]> {
-  const [rfiInsights, budgetInsights] = await Promise.all([
+  const [rfiInsights, budgetInsights, scheduleInsights] = await Promise.all([
     scanStaleRFIs(projectId, thresholds),
     scanBudgetOverruns(projectId),
+    scanScheduleSlippage(projectId),
   ])
   
-  return [...rfiInsights, ...budgetInsights].sort((a, b) => {
+  return [...rfiInsights, ...budgetInsights, ...scheduleInsights].sort((a, b) => {
     const severityOrder = { critical: 0, high: 1, medium: 2, low: 3 }
     return severityOrder[a.severity] - severityOrder[b.severity]
   })

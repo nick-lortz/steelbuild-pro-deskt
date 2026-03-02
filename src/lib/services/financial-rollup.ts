@@ -68,11 +68,32 @@ export async function triggerFinancialRollup(projectId: string): Promise<void> {
     const event = new CustomEvent('financialRollupComplete', {
       detail: { projectId, financials }
     })
-    window.dispatchEvent(event)
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(event)
+    }
   } catch (error) {
     console.error('Financial rollup failed:', error)
     throw error
   }
+}
+
+export async function onChangeOrderApproval(changeOrderId: string, projectId: string): Promise<void> {
+  await triggerFinancialRollup(projectId)
+  
+  const event = new CustomEvent('changeOrderApproved', {
+    detail: { changeOrderId, projectId }
+  })
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(event)
+  }
+}
+
+export async function onCostCodeUpdate(costCodeId: string, projectId: string): Promise<void> {
+  await triggerFinancialRollup(projectId)
+}
+
+export async function onContractUpdate(contractId: string, projectId: string): Promise<void> {
+  await triggerFinancialRollup(projectId)
 }
 
 export async function recalculateAllProjectFinancials(): Promise<Map<string, ProjectFinancials>> {
