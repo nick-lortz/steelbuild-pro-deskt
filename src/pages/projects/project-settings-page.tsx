@@ -17,10 +17,12 @@ import {
   CurrencyDollar,
   MapPin,
   User,
-  WarningCircle
+  WarningCircle,
+  Clock
 } from '@phosphor-icons/react'
 import { projectsDb } from '@/lib/db'
 import type { Project } from '@/lib/types'
+import { TimezoneSelect } from '@/components/shared/timezone-select'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -51,6 +53,7 @@ export function ProjectSettingsPage() {
     endDate: '',
     contractValue: 0,
     description: '',
+    timeZone: '',
   })
 
   useEffect(() => {
@@ -72,6 +75,7 @@ export function ProjectSettingsPage() {
             endDate: proj.endDate || '',
             contractValue: proj.contractValue,
             description: proj.description || '',
+            timeZone: proj.timeZone || '',
           })
         }
       } catch (error) {
@@ -105,6 +109,7 @@ export function ProjectSettingsPage() {
         endDate: formData.endDate || undefined,
         contractValue: formData.contractValue,
         description: formData.description || undefined,
+        timeZone: formData.timeZone || undefined,
       })
       
       setProject(updated)
@@ -268,6 +273,21 @@ export function ProjectSettingsPage() {
                   placeholder="Chicago, IL"
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="project-timezone" className="flex items-center gap-2">
+                <Clock size={16} />
+                Project Time Zone
+              </Label>
+              <TimezoneSelect
+                id="project-timezone"
+                value={formData.timeZone}
+                onValueChange={(value) => handleFieldChange('timeZone', value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Override global timezone for this project. Used for scheduling and team coordination across different regions.
+              </p>
             </div>
 
             <div className="space-y-2">

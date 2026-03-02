@@ -9,6 +9,7 @@ export interface Project {
   endDate?: string
   contractValue: number
   description?: string
+  timeZone?: string
   createdAt: string
   updatedAt: string
   deletedAt?: string

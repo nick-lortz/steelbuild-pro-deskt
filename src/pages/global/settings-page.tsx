@@ -24,6 +24,7 @@ import {
   Users
 } from '@phosphor-icons/react'
 import { GradientSettingsCard } from '@/components/settings/gradient-settings-card'
+import { TimezoneSelect } from '@/components/shared/timezone-select'
 
 interface GlobalSettings {
   company: {
@@ -299,20 +300,14 @@ export function SettingsPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="timezone">Time Zone</Label>
-                  <Select
+                  <TimezoneSelect
+                    id="timezone"
                     value={settings.defaults.timeZone}
                     onValueChange={value => updateSettings('defaults', 'timeZone', value)}
-                  >
-                    <SelectTrigger id="timezone">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="America/New_York">Eastern (ET)</SelectItem>
-                      <SelectItem value="America/Chicago">Central (CT)</SelectItem>
-                      <SelectItem value="America/Denver">Mountain (MT)</SelectItem>
-                      <SelectItem value="America/Los_Angeles">Pacific (PT)</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Used for scheduling, reports, and timestamping across international teams
+                  </p>
                 </div>
 
                 <div className="space-y-2">
