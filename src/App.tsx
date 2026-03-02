@@ -1,6 +1,7 @@
 import { RouterProvider } from 'react-router-dom'
 import { router } from './router'
 import { useEffect } from 'react'
+import { ThemeProvider } from '@/components/shared/theme-provider'
 
 function App() {
   useEffect(() => {
@@ -9,7 +10,11 @@ function App() {
     }
   }, []);
 
-  return <RouterProvider router={router} />
+  return (
+    <ThemeProvider defaultTheme="dark">
+      <RouterProvider router={router} />
+    </ThemeProvider>
+  )
 }
 
 export default App

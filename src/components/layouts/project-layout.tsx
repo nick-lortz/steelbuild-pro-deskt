@@ -63,26 +63,26 @@ export function ProjectLayout() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Link to="/projects">
-            <Button variant="ghost" size="sm" className="gap-2">
+            <Button variant="ghost" size="sm" className="gap-2 hover:bg-accent/10 transition-colors">
               <ArrowLeft size={18} />
               Back to Projects
             </Button>
           </Link>
           <div>
-            <h1 className="text-3xl font-bold">{project.name}</h1>
-            <p className="text-muted-foreground">
+            <h1 className="font-display text-3xl font-bold">{project.name}</h1>
+            <p className="text-muted-foreground font-mono text-sm">
               {project.number} • {project.client}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <PMANotificationBadge projectId={projectId} onOpen={() => setPmaOpen(true)} />
-          <Button variant="default" size="sm" className="gap-2" onClick={() => setPmaOpen(true)}>
-            <Robot size={18} />
+          <Button variant="default" size="sm" className="gap-2 shadow-sm hover:shadow-md transition-all dark:welder-glow" onClick={() => setPmaOpen(true)}>
+            <Robot size={18} weight="duotone" />
             PMA
           </Button>
           <Link to={`/projects/${projectId}/settings`}>
-            <Button variant="outline" size="sm" className="gap-2">
+            <Button variant="outline" size="sm" className="gap-2 hover:border-accent/50 transition-colors">
               <Gear size={18} />
               Settings
             </Button>
@@ -91,9 +91,9 @@ export function ProjectLayout() {
       </div>
 
       <Tabs value={activeTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8 gap-1">
+        <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8 gap-1 bg-secondary/50 p-1.5 rounded-lg">
           <Link to={`/projects/${projectId}`}>
-            <TabsTrigger value="overview" className="w-full gap-1.5">
+            <TabsTrigger value="overview" className="w-full gap-1.5 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground transition-all">
               <ChartBar size={16} />
               <span className="hidden sm:inline">Overview</span>
             </TabsTrigger>

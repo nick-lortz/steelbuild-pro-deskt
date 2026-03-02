@@ -84,7 +84,7 @@ export function DashboardPage() {
     <div className="space-y-8 animate-in">
       <div className="flex items-start justify-between">
         <div>
-          <h2 className="text-4xl font-bold tracking-tight bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">Dashboard</h2>
+          <h2 className="font-display text-4xl font-bold tracking-tight">Dashboard</h2>
           <p className="text-muted-foreground mt-2 text-base">
             Overview of your steel fabrication projects and operations
           </p>
@@ -122,31 +122,31 @@ export function DashboardPage() {
       )}
 
       <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="overflow-hidden hover:shadow-md transition-all duration-200 border-border/50 bg-gradient-to-br from-card to-card/50">
+        <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:scale-[1.02] border-border/50 construction-card steel-shadow group">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
             <CardTitle className="text-sm font-semibold text-muted-foreground">Active Projects</CardTitle>
-            <div className="p-2 bg-primary/10 rounded-lg">
-              <Buildings size={20} className="text-primary" weight="duotone" />
+            <div className="p-2 bg-accent/10 rounded-lg group-hover:bg-accent/20 transition-colors">
+              <Buildings size={20} className="text-accent" weight="duotone" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold tracking-tight">{activeProjects.length}</div>
+            <div className="font-mono text-3xl font-bold tracking-tight">{activeProjects.length}</div>
             <p className="text-xs text-muted-foreground mt-1">
               of {projects.length} total projects
             </p>
-            <Progress value={(activeProjects.length / Math.max(projects.length, 1)) * 100} className="mt-3 h-1.5" />
+            <Progress value={(activeProjects.length / Math.max(projects.length, 1)) * 100} className="mt-3 h-2" />
           </CardContent>
         </Card>
 
-        <Card className="overflow-hidden hover:shadow-md transition-all duration-200 border-border/50 bg-gradient-to-br from-card to-card/50">
+        <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:scale-[1.02] border-border/50 construction-card steel-shadow group">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
             <CardTitle className="text-sm font-semibold text-muted-foreground">Contract Value</CardTitle>
-            <div className="p-2 bg-success/10 rounded-lg">
+            <div className="p-2 bg-success/10 rounded-lg group-hover:bg-success/20 transition-colors">
               <CurrencyDollar size={20} className="text-success" weight="duotone" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold tracking-tight">
+            <div className="font-mono text-3xl font-bold tracking-tight">
               ${(totalContractValue / 1000000).toFixed(1)}M
             </div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -159,15 +159,15 @@ export function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="overflow-hidden hover:shadow-md transition-all duration-200 border-border/50 bg-gradient-to-br from-card to-card/50">
+        <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:scale-[1.02] border-border/50 construction-card steel-shadow group">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
             <CardTitle className="text-sm font-semibold text-muted-foreground">Open RFIs</CardTitle>
-            <div className="p-2 bg-warning/10 rounded-lg">
+            <div className="p-2 bg-warning/10 rounded-lg group-hover:bg-warning/20 transition-colors">
               <FileText size={20} className="text-warning" weight="duotone" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold tracking-tight">{openRFIs}</div>
+            <div className="font-mono text-3xl font-bold tracking-tight">{openRFIs}</div>
             <p className="text-xs text-muted-foreground mt-1">
               Awaiting response
             </p>
@@ -177,15 +177,15 @@ export function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="overflow-hidden hover:shadow-md transition-all duration-200 border-border/50 bg-gradient-to-br from-card to-card/50">
+        <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:scale-[1.02] border-border/50 construction-card steel-shadow group">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
             <CardTitle className="text-sm font-semibold text-muted-foreground">Overdue Tasks</CardTitle>
-            <div className="p-2 bg-destructive/10 rounded-lg">
+            <div className="p-2 bg-destructive/10 rounded-lg group-hover:bg-destructive/20 transition-colors">
               <Calendar size={20} className="text-destructive" weight="duotone" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold tracking-tight text-destructive">{overdueTasks}</div>
+            <div className="font-mono text-3xl font-bold tracking-tight text-destructive">{overdueTasks}</div>
             <p className="text-xs text-muted-foreground mt-1">
               Behind schedule
             </p>
@@ -200,60 +200,60 @@ export function DashboardPage() {
       </div>
 
       <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="overflow-hidden hover:shadow-md transition-all duration-200 border-border/50 bg-gradient-to-br from-card to-card/50">
+        <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:scale-[1.02] border-border/50 construction-card steel-shadow group">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
             <CardTitle className="text-sm font-semibold text-muted-foreground">Equipment Fleet</CardTitle>
-            <div className="p-2 bg-accent/10 rounded-lg">
+            <div className="p-2 bg-accent/10 rounded-lg group-hover:bg-accent/20 transition-colors">
               <Wrench size={20} className="text-accent" weight="duotone" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold tracking-tight">{equipment.length}</div>
+            <div className="font-mono text-3xl font-bold tracking-tight">{equipment.length}</div>
             <p className="text-xs text-muted-foreground mt-1">
               Units in fleet
             </p>
           </CardContent>
         </Card>
 
-        <Card className="overflow-hidden hover:shadow-md transition-all duration-200 border-border/50 bg-gradient-to-br from-card to-card/50">
+        <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:scale-[1.02] border-border/50 construction-card steel-shadow group">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
             <CardTitle className="text-sm font-semibold text-muted-foreground">Pending Checklists</CardTitle>
-            <div className="p-2 bg-primary/10 rounded-lg">
-              <ListChecks size={20} className="text-primary" weight="duotone" />
+            <div className="p-2 bg-accent/10 rounded-lg group-hover:bg-accent/20 transition-colors">
+              <ListChecks size={20} className="text-accent" weight="duotone" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold tracking-tight">{pendingChecklists.length}</div>
+            <div className="font-mono text-3xl font-bold tracking-tight">{pendingChecklists.length}</div>
             <p className="text-xs text-muted-foreground mt-1">
               Require attention
             </p>
           </CardContent>
         </Card>
 
-        <Card className="overflow-hidden hover:shadow-md transition-all duration-200 border-border/50 bg-gradient-to-br from-card to-card/50">
+        <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:scale-[1.02] border-border/50 construction-card steel-shadow group">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
             <CardTitle className="text-sm font-semibold text-muted-foreground">Pending Submittals</CardTitle>
-            <div className="p-2 bg-warning/10 rounded-lg">
+            <div className="p-2 bg-warning/10 rounded-lg group-hover:bg-warning/20 transition-colors">
               <FileText size={20} className="text-warning" weight="duotone" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold tracking-tight">{pendingSubmittals}</div>
+            <div className="font-mono text-3xl font-bold tracking-tight">{pendingSubmittals}</div>
             <p className="text-xs text-muted-foreground mt-1">
               In review
             </p>
           </CardContent>
         </Card>
 
-        <Card className="overflow-hidden hover:shadow-md transition-all duration-200 border-border/50 bg-gradient-to-br from-card to-card/50">
+        <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:scale-[1.02] border-border/50 construction-card steel-shadow group">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
             <CardTitle className="text-sm font-semibold text-muted-foreground">Critical Alerts</CardTitle>
-            <div className="p-2 bg-destructive/10 rounded-lg">
+            <div className="p-2 bg-destructive/10 rounded-lg group-hover:bg-destructive/20 transition-colors">
               <Warning size={20} className="text-destructive" weight="duotone" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold tracking-tight text-destructive">{criticalAlerts}</div>
+            <div className="font-mono text-3xl font-bold tracking-tight text-destructive">{criticalAlerts}</div>
             <p className="text-xs text-muted-foreground mt-1">
               Immediate action
             </p>
@@ -262,32 +262,32 @@ export function DashboardPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <Card className="overflow-hidden border-border/50 hover:border-border transition-colors">
+        <Card className="overflow-hidden border-border/50 hover:border-accent/50 transition-all duration-300 construction-card steel-shadow">
           <CardHeader className="pb-4">
-            <CardTitle className="text-xl">Quick Actions</CardTitle>
+            <CardTitle className="font-display text-xl">Quick Actions</CardTitle>
             <CardDescription>Common tasks and operations</CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-3">
             <Link to="/projects">
-              <Button className="w-full justify-start gap-2 shadow-sm hover:shadow-md transition-shadow">
+              <Button className="w-full justify-start gap-2 shadow-sm hover:shadow-md transition-all duration-200 hover:scale-[1.02]">
                 <Plus size={18} weight="bold" />
                 New Project
               </Button>
             </Link>
             <Link to="/cost-codes">
-              <Button variant="outline" className="w-full justify-start gap-2 hover:bg-secondary/50 transition-colors">
+              <Button variant="outline" className="w-full justify-start gap-2 hover:bg-secondary/50 hover:border-accent/50 transition-all duration-200 hover:scale-[1.02]">
                 <CurrencyDollar size={18} weight="duotone" />
                 Cost Codes
               </Button>
             </Link>
             <Link to="/equipment">
-              <Button variant="outline" className="w-full justify-start gap-2 hover:bg-secondary/50 transition-colors">
+              <Button variant="outline" className="w-full justify-start gap-2 hover:bg-secondary/50 hover:border-accent/50 transition-all duration-200 hover:scale-[1.02]">
                 <Wrench size={18} weight="duotone" />
                 Equipment
               </Button>
             </Link>
             <Link to="/audit">
-              <Button variant="outline" className="w-full justify-start gap-2 hover:bg-secondary/50 transition-colors">
+              <Button variant="outline" className="w-full justify-start gap-2 hover:bg-secondary/50 hover:border-accent/50 transition-all duration-200 hover:scale-[1.02]">
                 <CheckCircle size={18} weight="duotone" />
                 Data Audit
               </Button>
@@ -295,9 +295,9 @@ export function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="overflow-hidden border-border/50 hover:border-border transition-colors">
+        <Card className="overflow-hidden border-border/50 hover:border-accent/50 transition-all duration-300 construction-card steel-shadow">
           <CardHeader className="pb-4">
-            <CardTitle className="text-xl">System Health</CardTitle>
+            <CardTitle className="font-display text-xl">System Health</CardTitle>
             <CardDescription>Overall status indicators</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
