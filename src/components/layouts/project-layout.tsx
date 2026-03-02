@@ -21,6 +21,9 @@ import {
   ListChecks,
   Robot,
   Note,
+  Hammer,
+  Factory,
+  HardHat,
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -91,11 +94,41 @@ export function ProjectLayout() {
       </div>
 
       <Tabs value={activeTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8 gap-1 bg-secondary/50 p-1.5 rounded-lg">
+        <TabsList className="grid w-full grid-cols-4 lg:grid-cols-9 gap-1 bg-secondary/50 p-1.5 rounded-lg">
           <Link to={`/projects/${projectId}`}>
             <TabsTrigger value="overview" className="w-full gap-1.5 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground transition-all">
               <ChartBar size={16} />
-              <span className="hidden sm:inline">Overview</span>
+              <span className="hidden sm:inline">Dashboard</span>
+            </TabsTrigger>
+          </Link>
+          <Link to={`/projects/${projectId}/work-packages`}>
+            <TabsTrigger value="work-packages" className="w-full gap-1.5">
+              <Package size={16} />
+              <span className="hidden sm:inline">Work Packages</span>
+            </TabsTrigger>
+          </Link>
+          <Link to={`/projects/${projectId}/drawings`}>
+            <TabsTrigger value="drawings" className="w-full gap-1.5">
+              <Stack size={16} />
+              <span className="hidden sm:inline">Detailing</span>
+            </TabsTrigger>
+          </Link>
+          <Link to={`/projects/${projectId}/fab-tracking`}>
+            <TabsTrigger value="fab-tracking" className="w-full gap-1.5">
+              <Factory size={16} />
+              <span className="hidden sm:inline">Fabrication</span>
+            </TabsTrigger>
+          </Link>
+          <Link to={`/projects/${projectId}/deliveries`}>
+            <TabsTrigger value="deliveries" className="w-full gap-1.5">
+              <Truck size={16} />
+              <span className="hidden sm:inline">Deliveries</span>
+            </TabsTrigger>
+          </Link>
+          <Link to={`/projects/${projectId}/lookahead`}>
+            <TabsTrigger value="lookahead" className="w-full gap-1.5">
+              <HardHat size={16} />
+              <span className="hidden sm:inline">Install/Erection</span>
             </TabsTrigger>
           </Link>
           <Link to={`/projects/${projectId}/schedule`}>
@@ -116,49 +149,13 @@ export function ProjectLayout() {
               <span className="hidden sm:inline">RFIs</span>
             </TabsTrigger>
           </Link>
-          <Link to={`/projects/${projectId}/documents`}>
-            <TabsTrigger value="documents" className="w-full gap-1.5">
-              <FileText size={16} />
-              <span className="hidden sm:inline">Docs</span>
-            </TabsTrigger>
-          </Link>
-          <Link to={`/projects/${projectId}/drawings`}>
-            <TabsTrigger value="drawings" className="w-full gap-1.5">
-              <Stack size={16} />
-              <span className="hidden sm:inline">Drawings</span>
-            </TabsTrigger>
-          </Link>
-          <Link to={`/projects/${projectId}/work-packages`}>
-            <TabsTrigger value="work-packages" className="w-full gap-1.5">
-              <Package size={16} />
-              <span className="hidden sm:inline">Packages</span>
-            </TabsTrigger>
-          </Link>
-          <Link to={`/projects/${projectId}/deliveries`}>
-            <TabsTrigger value="deliveries" className="w-full gap-1.5">
-              <Truck size={16} />
-              <span className="hidden sm:inline">Deliveries</span>
-            </TabsTrigger>
-          </Link>
         </TabsList>
 
         <div className="flex gap-2 overflow-x-auto pb-2">
-          <Link to={`/projects/${projectId}/reporting`}>
-            <Button variant={activeTab === 'reporting' ? 'secondary' : 'outline'} size="sm" className="gap-2">
-              <ChartBar size={16} />
-              Analytics
-            </Button>
-          </Link>
-          <Link to={`/projects/${projectId}/budget-tracking`}>
-            <Button variant={activeTab === 'budget-tracking' ? 'secondary' : 'outline'} size="sm" className="gap-2">
-              <TrendUp size={16} />
-              Budget Forecast
-            </Button>
-          </Link>
-          <Link to={`/projects/${projectId}/sov-tracking`}>
-            <Button variant={activeTab === 'sov-tracking' ? 'secondary' : 'outline'} size="sm" className="gap-2">
-              <ListChecks size={16} />
-              SOV
+          <Link to={`/projects/${projectId}/documents`}>
+            <Button variant={activeTab === 'documents' ? 'secondary' : 'outline'} size="sm" className="gap-2">
+              <FileText size={16} />
+              Documents
             </Button>
           </Link>
           <Link to={`/projects/${projectId}/labor`}>

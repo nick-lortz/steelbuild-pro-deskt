@@ -61,36 +61,6 @@ export function MainLayout() {
                   Portfolio
                 </Button>
               </Link>
-              <Link to="/equipment">
-                <Button
-                  variant={isActive('/equipment') ? 'secondary' : 'ghost'}
-                  size="sm"
-                  className="gap-2 font-medium transition-all duration-200"
-                >
-                  <Wrench size={18} weight={isActive('/equipment') ? 'fill' : 'regular'} />
-                  Equipment
-                </Button>
-              </Link>
-              <Link to="/cost-codes">
-                <Button
-                  variant={isActive('/cost-codes') ? 'secondary' : 'ghost'}
-                  size="sm"
-                  className="gap-2 font-medium transition-all duration-200"
-                >
-                  <CurrencyDollar size={18} weight={isActive('/cost-codes') ? 'fill' : 'regular'} />
-                  Cost Codes
-                </Button>
-              </Link>
-              <Link to="/audit">
-                <Button
-                  variant={isActive('/audit') ? 'secondary' : 'ghost'}
-                  size="sm"
-                  className="gap-2 font-medium transition-all duration-200"
-                >
-                  <ClipboardText size={18} weight={isActive('/audit') ? 'fill' : 'regular'} />
-                  Audit
-                </Button>
-              </Link>
             </nav>
           </div>
           
