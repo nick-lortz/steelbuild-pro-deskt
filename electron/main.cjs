@@ -26,6 +26,17 @@ const {
   dismissPMAInsight,
   generatePMAInsights,
   getDashboardCounts,
+  createNotification,
+  listNotifications,
+  markNotificationRead,
+  createDrawingSet,
+  listDrawingSets,
+  updateDrawingSetStatus,
+  deleteDrawingSet,
+  createDrawingSheet,
+  listDrawingSheets,
+  updateDrawingSheetStatus,
+  deleteDrawingSheet,
 } = require("./db/queries");
 
 const isDev = !app.isPackaged;
@@ -494,6 +505,94 @@ ipcMain.handle("db:dismissPMAInsight", async (event, id, userId, reason) => {
 ipcMain.handle("db:generatePMAInsights", async (event, projectId) => {
   try {
     return await generatePMAInsights(projectId);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:createNotification", async (event, data) => {
+  try {
+    return await createNotification(data);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:listNotifications", async (event, projectId, options) => {
+  try {
+    return await listNotifications(projectId, options);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:markNotificationRead", async (event, id) => {
+  try {
+    return await markNotificationRead(id);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:createDrawingSet", async (event, data) => {
+  try {
+    return await createDrawingSet(data);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:listDrawingSets", async (event, projectId, options) => {
+  try {
+    return await listDrawingSets(projectId, options);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:updateDrawingSetStatus", async (event, id, newStatus, userId) => {
+  try {
+    return await updateDrawingSetStatus(id, newStatus, userId);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:deleteDrawingSet", async (event, id, userId) => {
+  try {
+    return await deleteDrawingSet(id, userId);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:createDrawingSheet", async (event, data) => {
+  try {
+    return await createDrawingSheet(data);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:listDrawingSheets", async (event, setId, options) => {
+  try {
+    return await listDrawingSheets(setId, options);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:updateDrawingSheetStatus", async (event, id, newStatus, userId) => {
+  try {
+    return await updateDrawingSheetStatus(id, newStatus, userId);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:deleteDrawingSheet", async (event, id, userId) => {
+  try {
+    return await deleteDrawingSheet(id, userId);
   } catch (error) {
     return { success: false, error: error.message };
   }

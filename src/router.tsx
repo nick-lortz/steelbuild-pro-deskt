@@ -13,7 +13,7 @@ import { ReportingAnalyticsPage } from '@/pages/financials/reporting-analytics-p
 import { CustomReportBuilderPage } from '@/pages/financials/custom-report-builder-page'
 import { RFIsPage } from '@/pages/rfis/rfis-page'
 import { DocumentsPage } from '@/pages/documents/documents-page'
-import { DrawingsPage } from '@/pages/drawings/drawings-page'
+import { DrawingsDBPage } from '@/pages/drawings/drawings-db-page'
 import { WorkPackagesPage } from '@/pages/work-packages/work-packages-page'
 import { DeliveriesPage } from '@/pages/deliveries/deliveries-page'
 import { LaborPage } from '@/pages/labor/labor-page'
@@ -118,7 +118,7 @@ export const router = createBrowserRouter([
           },
           {
             path: 'drawings',
-            element: <DrawingsPage />,
+            element: <DrawingsDBPage />,
           },
           {
             path: 'work-packages',

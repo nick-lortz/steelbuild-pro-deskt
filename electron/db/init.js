@@ -3,7 +3,7 @@ const { drizzle } = require('drizzle-orm/better-sqlite3');
 const { migrate } = require('drizzle-orm/better-sqlite3/migrator');
 const path = require('path');
 const fs = require('fs');
-const { projects, rfis, equipment, cost_codes, audit_log } = require('../../packages/db/schema');
+const { projects, rfis, equipment, cost_codes, audit_log, drawing_sets, drawing_sheets, notifications } = require('../../packages/db/schema');
 
 let db = null;
 let sqliteDb = null;
@@ -21,7 +21,7 @@ function initDatabase(userDataPath) {
   sqliteDb.pragma('foreign_keys = ON');
   
   db = drizzle(sqliteDb, {
-    schema: { projects, rfis, equipment, cost_codes, audit_log }
+    schema: { projects, rfis, equipment, cost_codes, audit_log, drawing_sets, drawing_sheets, notifications }
   });
   
   createTablesIfNotExists();
@@ -153,6 +153,48 @@ function createTablesIfNotExists() {
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
     );
 
+    CREATE TABLE IF NOT EXISTS drawing_sets (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'IFA',
+      discipline TEXT,
+      set_number TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      created_by TEXT,
+      updated_by TEXT,
+      deleted_at TEXT,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS drawing_sheets (
+      id TEXT PRIMARY KEY,
+      set_id TEXT NOT NULL,
+      sheet_no TEXT NOT NULL,
+      title TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'IFA',
+      file_key TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      created_by TEXT,
+      updated_by TEXT,
+      deleted_at TEXT,
+      FOREIGN KEY (set_id) REFERENCES drawing_sets(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS notifications (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      message TEXT NOT NULL,
+      entity_refs_json TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      read_at TEXT,
+      user_id TEXT,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    );
+
     CREATE INDEX IF NOT EXISTS idx_rfis_project_id ON rfis(project_id);
     CREATE INDEX IF NOT EXISTS idx_equipment_project_id ON equipment(project_id);
     CREATE INDEX IF NOT EXISTS idx_cost_codes_project_id ON cost_codes(project_id);
@@ -160,6 +202,12 @@ function createTablesIfNotExists() {
     CREATE INDEX IF NOT EXISTS idx_pma_insights_project_id ON pma_insights(project_id);
     CREATE INDEX IF NOT EXISTS idx_pma_insights_status ON pma_insights(status);
     CREATE INDEX IF NOT EXISTS idx_audit_log_entity ON audit_log(entity_type, entity_id);
+    CREATE INDEX IF NOT EXISTS idx_drawing_sets_project_id ON drawing_sets(project_id);
+    CREATE INDEX IF NOT EXISTS idx_drawing_sets_status ON drawing_sets(status);
+    CREATE INDEX IF NOT EXISTS idx_drawing_sheets_set_id ON drawing_sheets(set_id);
+    CREATE INDEX IF NOT EXISTS idx_drawing_sheets_status ON drawing_sheets(status);
+    CREATE INDEX IF NOT EXISTS idx_notifications_project_id ON notifications(project_id);
+    CREATE INDEX IF NOT EXISTS idx_notifications_read_at ON notifications(read_at);
   `);
 }
 

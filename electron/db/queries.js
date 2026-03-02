@@ -1,7 +1,28 @@
 const { eq, and, isNull, desc, sql } = require('drizzle-orm');
 const { getDatabase, getSQLiteDB } = require('./init');
-const { projects, rfis, equipment, cost_codes, audit_log } = require('../../packages/db/schema');
+const { projects, rfis, equipment, cost_codes, audit_log, drawing_sets, drawing_sheets, notifications } = require('../../packages/db/schema');
 const { v4: uuidv4 } = require('uuid');
+
+const STATUS_SEQUENCE = ['IFA', 'BFA', 'OFS', 'BFS', 'FFF'];
+
+function canTransitionStatus(currentStatus, newStatus) {
+  const currentIndex = STATUS_SEQUENCE.indexOf(currentStatus);
+  const newIndex = STATUS_SEQUENCE.indexOf(newStatus);
+  
+  if (currentIndex === -1 || newIndex === -1) {
+    return { allowed: false, error: 'Invalid status' };
+  }
+  
+  if (newIndex === currentIndex + 1) {
+    return { allowed: true };
+  }
+  
+  if (newIndex <= currentIndex) {
+    return { allowed: false, error: 'Cannot move backwards in status sequence' };
+  }
+  
+  return { allowed: false, error: `Cannot skip from ${currentStatus} to ${newStatus}. Next valid status is ${STATUS_SEQUENCE[currentIndex + 1]}` };
+}
 
 function logAudit(entityType, entityId, action, projectId = null, payload = null, userId = null) {
   const db = getDatabase();
@@ -704,6 +725,303 @@ async function getDashboardCounts(projectId) {
   };
 }
 
+async function createNotification(data) {
+  const db = getDatabase();
+  const id = uuidv4();
+  const now = new Date().toISOString();
+  
+  const notification = {
+    id,
+    project_id: data.project_id,
+    type: data.type,
+    message: data.message,
+    entity_refs_json: data.entity_refs ? JSON.stringify(data.entity_refs) : null,
+    user_id: data.user_id || null,
+    created_at: now,
+  };
+  
+  db.insert(notifications).values(notification).run();
+  
+  return { success: true, data: notification };
+}
+
+async function listNotifications(projectId, options = {}) {
+  const db = getDatabase();
+  const { unreadOnly = false, limit = 50, offset = 0 } = options;
+  
+  let query = db
+    .select()
+    .from(notifications)
+    .where(and(
+      eq(notifications.project_id, projectId),
+      unreadOnly ? isNull(notifications.read_at) : undefined
+    ))
+    .orderBy(desc(notifications.created_at))
+    .limit(limit)
+    .offset(offset);
+  
+  const results = query.all();
+  
+  return { 
+    success: true, 
+    data: results.map(n => ({
+      ...n,
+      entity_refs: n.entity_refs_json ? JSON.parse(n.entity_refs_json) : []
+    }))
+  };
+}
+
+async function markNotificationRead(id) {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+  
+  db.update(notifications)
+    .set({ read_at: now })
+    .where(eq(notifications.id, id))
+    .run();
+  
+  return { success: true };
+}
+
+async function createDrawingSet(data) {
+  const db = getDatabase();
+  const id = uuidv4();
+  const now = new Date().toISOString();
+  
+  const drawingSet = {
+    id,
+    project_id: data.project_id,
+    name: data.name,
+    status: data.status || 'IFA',
+    discipline: data.discipline || null,
+    set_number: data.set_number || null,
+    created_at: now,
+    updated_at: now,
+    created_by: data.created_by || null,
+  };
+  
+  db.insert(drawing_sets).values(drawingSet).run();
+  logAudit('drawing_set', id, 'create', data.project_id, drawingSet, data.created_by);
+  
+  await createNotification({
+    project_id: data.project_id,
+    type: 'drawing-set-created',
+    message: `Drawing set "${data.name}" created with status ${drawingSet.status}`,
+    entity_refs: [
+      {
+        entity_type: 'drawing_set',
+        entity_id: id,
+        label: data.name,
+      }
+    ]
+  });
+  
+  return { success: true, data: drawingSet };
+}
+
+async function listDrawingSets(projectId, options = {}) {
+  const db = getDatabase();
+  const { status, limit = 100, offset = 0 } = options;
+  
+  let query = db
+    .select()
+    .from(drawing_sets)
+    .where(and(
+      eq(drawing_sets.project_id, projectId),
+      isNull(drawing_sets.deleted_at),
+      status ? eq(drawing_sets.status, status) : undefined
+    ))
+    .orderBy(desc(drawing_sets.created_at))
+    .limit(limit)
+    .offset(offset);
+  
+  const results = query.all();
+  return { success: true, data: results };
+}
+
+async function updateDrawingSetStatus(id, newStatus, userId = null) {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+  
+  const existing = db.select().from(drawing_sets).where(eq(drawing_sets.id, id)).get();
+  if (!existing) {
+    return { success: false, error: 'Drawing set not found' };
+  }
+  
+  const transition = canTransitionStatus(existing.status, newStatus);
+  if (!transition.allowed) {
+    return { success: false, error: transition.error };
+  }
+  
+  db.update(drawing_sets)
+    .set({ status: newStatus, updated_at: now, updated_by: userId })
+    .where(eq(drawing_sets.id, id))
+    .run();
+  
+  logAudit('drawing_set', id, 'status-change', existing.project_id, { from: existing.status, to: newStatus }, userId);
+  
+  const statusMessages = {
+    'BFA': 'ready for fabricator review',
+    'OFS': 'out for signature',
+    'BFS': 'back from signature',
+    'FFF': 'fully approved for fabrication'
+  };
+  
+  await createNotification({
+    project_id: existing.project_id,
+    type: 'drawing-status-change',
+    message: `Drawing set "${existing.name}" moved to ${newStatus} — ${statusMessages[newStatus] || 'status updated'}`,
+    entity_refs: [
+      {
+        entity_type: 'drawing_set',
+        entity_id: id,
+        label: existing.name,
+      }
+    ]
+  });
+  
+  return { success: true };
+}
+
+async function deleteDrawingSet(id, userId = null) {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+  
+  const existing = db.select().from(drawing_sets).where(eq(drawing_sets.id, id)).get();
+  if (!existing) {
+    return { success: false, error: 'Drawing set not found' };
+  }
+  
+  db.update(drawing_sets)
+    .set({ deleted_at: now })
+    .where(eq(drawing_sets.id, id))
+    .run();
+  
+  logAudit('drawing_set', id, 'delete', existing.project_id, null, userId);
+  
+  return { success: true };
+}
+
+async function createDrawingSheet(data) {
+  const sqliteDb = getSQLiteDB();
+  const id = uuidv4();
+  const now = new Date().toISOString();
+  
+  const drawingSheet = {
+    id,
+    set_id: data.set_id,
+    sheet_no: data.sheet_no,
+    title: data.title,
+    status: data.status || 'IFA',
+    file_key: data.file_key || null,
+    created_at: now,
+    updated_at: now,
+    created_by: data.created_by || null,
+  };
+  
+  sqliteDb.prepare(`
+    INSERT INTO drawing_sheets (id, set_id, sheet_no, title, status, file_key, created_at, updated_at, created_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    drawingSheet.id,
+    drawingSheet.set_id,
+    drawingSheet.sheet_no,
+    drawingSheet.title,
+    drawingSheet.status,
+    drawingSheet.file_key,
+    drawingSheet.created_at,
+    drawingSheet.updated_at,
+    drawingSheet.created_by
+  );
+  
+  const set = sqliteDb.prepare('SELECT project_id, name FROM drawing_sets WHERE id = ?').get(data.set_id);
+  if (set) {
+    logAudit('drawing_sheet', id, 'create', set.project_id, drawingSheet, data.created_by);
+  }
+  
+  return { success: true, data: drawingSheet };
+}
+
+async function listDrawingSheets(setId, options = {}) {
+  const sqliteDb = getSQLiteDB();
+  const { status, limit = 100, offset = 0 } = options;
+  
+  const query = `
+    SELECT * FROM drawing_sheets 
+    WHERE set_id = ? AND deleted_at IS NULL
+    ${status ? 'AND status = ?' : ''}
+    ORDER BY sheet_no
+    LIMIT ? OFFSET ?
+  `;
+  
+  const params = status 
+    ? [setId, status, limit, offset]
+    : [setId, limit, offset];
+  
+  const results = sqliteDb.prepare(query).all(...params);
+  return { success: true, data: results };
+}
+
+async function updateDrawingSheetStatus(id, newStatus, userId = null) {
+  const sqliteDb = getSQLiteDB();
+  const now = new Date().toISOString();
+  
+  const existing = sqliteDb.prepare('SELECT * FROM drawing_sheets WHERE id = ?').get(id);
+  if (!existing) {
+    return { success: false, error: 'Drawing sheet not found' };
+  }
+  
+  const transition = canTransitionStatus(existing.status, newStatus);
+  if (!transition.allowed) {
+    return { success: false, error: transition.error };
+  }
+  
+  sqliteDb.prepare(`
+    UPDATE drawing_sheets 
+    SET status = ?, updated_at = ?, updated_by = ?
+    WHERE id = ?
+  `).run(newStatus, now, userId, id);
+  
+  const set = sqliteDb.prepare('SELECT project_id, name FROM drawing_sets WHERE id = ?').get(existing.set_id);
+  if (set) {
+    logAudit('drawing_sheet', id, 'status-change', set.project_id, { from: existing.status, to: newStatus }, userId);
+    
+    await createNotification({
+      project_id: set.project_id,
+      type: 'drawing-status-change',
+      message: `Drawing sheet ${existing.sheet_no} (${existing.title}) moved to ${newStatus}`,
+      entity_refs: [
+        {
+          entity_type: 'drawing_sheet',
+          entity_id: id,
+          label: existing.sheet_no,
+        }
+      ]
+    });
+  }
+  
+  return { success: true };
+}
+
+async function deleteDrawingSheet(id, userId = null) {
+  const sqliteDb = getSQLiteDB();
+  const now = new Date().toISOString();
+  
+  const existing = sqliteDb.prepare('SELECT * FROM drawing_sheets WHERE id = ?').get(id);
+  if (!existing) {
+    return { success: false, error: 'Drawing sheet not found' };
+  }
+  
+  sqliteDb.prepare('UPDATE drawing_sheets SET deleted_at = ? WHERE id = ?').run(now, id);
+  
+  const set = sqliteDb.prepare('SELECT project_id FROM drawing_sets WHERE id = ?').get(existing.set_id);
+  if (set) {
+    logAudit('drawing_sheet', id, 'delete', set.project_id, null, userId);
+  }
+  
+  return { success: true };
+}
+
 module.exports = {
   createRFI,
   listRFIs,
@@ -728,4 +1046,15 @@ module.exports = {
   dismissPMAInsight,
   generatePMAInsights,
   getDashboardCounts,
+  createNotification,
+  listNotifications,
+  markNotificationRead,
+  createDrawingSet,
+  listDrawingSets,
+  updateDrawingSetStatus,
+  deleteDrawingSet,
+  createDrawingSheet,
+  listDrawingSheets,
+  updateDrawingSheetStatus,
+  deleteDrawingSheet,
 };

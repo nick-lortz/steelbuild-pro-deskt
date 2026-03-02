@@ -89,6 +89,49 @@ export interface PMAInsight {
   dismiss_reason?: string;
 }
 
+export interface DrawingSet {
+  id: string;
+  project_id: string;
+  name: string;
+  status: 'IFA' | 'BFA' | 'OFS' | 'BFS' | 'FFF';
+  discipline?: string;
+  set_number?: string;
+  created_at: string;
+  updated_at: string;
+  created_by?: string;
+  updated_by?: string;
+  deleted_at?: string;
+}
+
+export interface DrawingSheet {
+  id: string;
+  set_id: string;
+  sheet_no: string;
+  title: string;
+  status: 'IFA' | 'BFA' | 'OFS' | 'BFS' | 'FFF';
+  file_key?: string;
+  created_at: string;
+  updated_at: string;
+  created_by?: string;
+  updated_by?: string;
+  deleted_at?: string;
+}
+
+export interface Notification {
+  id: string;
+  project_id: string;
+  type: string;
+  message: string;
+  entity_refs: Array<{
+    entity_type: string;
+    entity_id: string;
+    label: string;
+  }>;
+  created_at: string;
+  read_at?: string;
+  user_id?: string;
+}
+
 export interface DashboardCounts {
   rfi_count: number;
   equipment_count: number;
@@ -128,6 +171,17 @@ export interface SBPDB {
   resolvePMAInsight: (id: string, userId: string) => Promise<DBResult>;
   dismissPMAInsight: (id: string, userId: string, reason: string) => Promise<DBResult>;
   generatePMAInsights: (projectId: string) => Promise<DBResult<PMAInsight[]>>;
+  createNotification: (data: Partial<Notification>) => Promise<DBResult<Notification>>;
+  listNotifications: (projectId: string, options?: { unreadOnly?: boolean; limit?: number; offset?: number }) => Promise<DBResult<Notification[]>>;
+  markNotificationRead: (id: string) => Promise<DBResult>;
+  createDrawingSet: (data: Partial<DrawingSet>) => Promise<DBResult<DrawingSet>>;
+  listDrawingSets: (projectId: string, options?: { status?: string; limit?: number; offset?: number }) => Promise<DBResult<DrawingSet[]>>;
+  updateDrawingSetStatus: (id: string, newStatus: DrawingSet['status'], userId?: string) => Promise<DBResult>;
+  deleteDrawingSet: (id: string, userId?: string) => Promise<DBResult>;
+  createDrawingSheet: (data: Partial<DrawingSheet>) => Promise<DBResult<DrawingSheet>>;
+  listDrawingSheets: (setId: string, options?: { status?: string; limit?: number; offset?: number }) => Promise<DBResult<DrawingSheet[]>>;
+  updateDrawingSheetStatus: (id: string, newStatus: DrawingSheet['status'], userId?: string) => Promise<DBResult>;
+  deleteDrawingSheet: (id: string, userId?: string) => Promise<DBResult>;
 }
 
 declare global {
