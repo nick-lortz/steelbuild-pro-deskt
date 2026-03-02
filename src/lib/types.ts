@@ -11,6 +11,84 @@ export interface Project {
   description?: string
   createdAt: string
   updatedAt: string
+  deletedAt?: string
+}
+
+export interface ProjectMember {
+  id: string
+  projectId: string
+  userId: string
+  userName: string
+  email: string
+  role: 'owner' | 'admin' | 'member' | 'viewer'
+  permissions: string[]
+  joinedAt: string
+  createdAt: string
+}
+
+export interface ProjectContact {
+  id: string
+  projectId: string
+  name: string
+  company: string
+  role: string
+  email?: string
+  phone?: string
+  notes?: string
+  createdAt: string
+}
+
+export interface ProjectRisk {
+  id: string
+  projectId: string
+  title: string
+  description: string
+  category: 'schedule' | 'cost' | 'quality' | 'safety' | 'scope' | 'resource'
+  probability: 'low' | 'medium' | 'high'
+  impact: 'low' | 'medium' | 'high'
+  status: 'identified' | 'analyzing' | 'mitigating' | 'closed'
+  mitigation?: string
+  owner?: string
+  identifiedDate: string
+  createdAt: string
+}
+
+export interface ProjectBaseline {
+  id: string
+  projectId: string
+  name: string
+  description?: string
+  baselineDate: string
+  schedule: Record<string, unknown>
+  budget: Record<string, unknown>
+  scope: string[]
+  createdBy: string
+  createdAt: string
+}
+
+export interface ProjectChecklistItem {
+  id: string
+  projectId: string
+  category: 'setup' | 'execution' | 'closeout' | 'safety' | 'qa'
+  description: string
+  required: boolean
+  completed: boolean
+  completedBy?: string
+  completedDate?: string
+  order: number
+  createdAt: string
+}
+
+export interface PMControlEntry {
+  id: string
+  projectId: string
+  entryType: 'note' | 'decision' | 'issue' | 'observation'
+  title: string
+  content: string
+  priority?: 'low' | 'medium' | 'high'
+  tags: string[]
+  createdBy: string
+  createdAt: string
 }
 
 export interface CostCode {
@@ -162,6 +240,77 @@ export interface Task {
   createdAt: string
 }
 
+export interface TaskTemplate {
+  id: string
+  name: string
+  description?: string
+  category: string
+  tasks: Array<{
+    name: string
+    description?: string
+    estimatedDuration: number
+    dependencies: string[]
+  }>
+  createdAt: string
+}
+
+export interface Constraint {
+  id: string
+  projectId: string
+  taskId: string
+  type: 'start-no-earlier' | 'finish-no-later' | 'must-start-on' | 'must-finish-on'
+  date: string
+  reason: string
+  createdAt: string
+}
+
+export interface ExecutionTask {
+  id: string
+  projectId: string
+  workPackageId?: string
+  name: string
+  description?: string
+  status: 'pending' | 'approved' | 'in-progress' | 'completed' | 'rejected'
+  startDate?: string
+  completionDate?: string
+  assignedTo?: string
+  createdAt: string
+}
+
+export interface ExecutionGate {
+  id: string
+  projectId: string
+  name: string
+  description: string
+  gateType: 'design' | 'fabrication' | 'erection' | 'approval' | 'milestone'
+  status: 'pending' | 'approved' | 'rejected'
+  requiredBy: string
+  dependencies: string[]
+  createdAt: string
+}
+
+export interface ExecutionPermission {
+  id: string
+  projectId: string
+  userId: string
+  taskId?: string
+  gateId?: string
+  permissionType: 'approve' | 'execute' | 'review' | 'view'
+  grantedBy: string
+  grantedAt: string
+}
+
+export interface ApprovalGateDecision {
+  id: string
+  gateId: string
+  projectId: string
+  decision: 'approved' | 'rejected' | 'conditional'
+  decidedBy: string
+  decidedAt: string
+  comments?: string
+  conditions?: string[]
+}
+
 export interface Budget {
   id: string
   projectId: string
@@ -210,6 +359,28 @@ export interface RFI {
   answeredDate?: string
   escalatedDate?: string
   dueDate?: string
+  createdAt: string
+}
+
+export interface RFISuggestion {
+  id: string
+  rfiId: string
+  projectId: string
+  suggestion: string
+  suggestedBy: 'ai' | 'user'
+  confidence?: number
+  createdAt: string
+}
+
+export interface ResponseLagEvent {
+  id: string
+  rfiId: string
+  projectId: string
+  expectedResponseDate: string
+  actualResponseDate?: string
+  lagDays: number
+  impact: 'low' | 'medium' | 'high'
+  reason?: string
   createdAt: string
 }
 
