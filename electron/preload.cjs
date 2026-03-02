@@ -117,6 +117,9 @@ contextBridge.exposeInMainWorld("SBP", {
     updateContract: (id, data) => ipcRenderer.invoke("db:updateContract", id, data),
     deleteContract: (id, userId) => ipcRenderer.invoke("db:deleteContract", id, userId),
     calculateAutomatedSOV: (projectId) => ipcRenderer.invoke("db:calculateAutomatedSOV", projectId),
+    recalculateProjectBudget: (projectId) => ipcRenderer.invoke("db:recalculateProjectBudget", projectId),
+    getProjectFinancialSummary: (projectId) => ipcRenderer.invoke("db:getProjectFinancialSummary", projectId),
+    updateProjectContractValue: (projectId, originalValue) => ipcRenderer.invoke("db:updateProjectContractValue", projectId, originalValue),
   },
   file: {
     uploadDrawing: (fileData) => ipcRenderer.invoke("file:uploadDrawing", fileData),

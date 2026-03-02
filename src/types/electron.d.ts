@@ -186,6 +186,36 @@ export interface DashboardCounts {
   total_actual: number;
 }
 
+export interface ProjectFinancialSummary {
+  original_contract_value: number;
+  current_contract_value: number;
+  approved_change_order_total: number;
+  pending_change_order_total: number;
+  potential_contract_value: number;
+  total_budget: number;
+  total_actual: number;
+  approved_change_orders: Array<{
+    id: string;
+    number: string;
+    title: string;
+    total: number;
+    approved_date: string;
+  }>;
+  pending_change_orders: Array<{
+    id: string;
+    number: string;
+    title: string;
+    total: number;
+    requested_date: string;
+  }>;
+}
+
+export interface BudgetRecalculationResult {
+  original_value: number;
+  change_order_total: number;
+  new_contract_value: number;
+}
+
 export interface DBResult<T = any> {
   success: boolean;
   data?: T;
@@ -264,6 +294,9 @@ export interface SBPDB {
   updateContract: (id: string, data: Partial<Contract>) => Promise<DBResult>;
   deleteContract: (id: string, userId?: string) => Promise<DBResult>;
   calculateAutomatedSOV: (projectId: string) => Promise<DBResult<any>>;
+  recalculateProjectBudget: (projectId: string) => Promise<DBResult<BudgetRecalculationResult>>;
+  getProjectFinancialSummary: (projectId: string) => Promise<DBResult<ProjectFinancialSummary>>;
+  updateProjectContractValue: (projectId: string, originalValue: number) => Promise<DBResult>;
 }
 
 declare global {

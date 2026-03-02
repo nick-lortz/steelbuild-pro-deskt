@@ -1379,12 +1379,28 @@ async function deleteContract(id, userId = null) {
 async function recalculateProjectBudget(projectId) {
   const sqliteDb = getSQLiteDB();
   
+  const project = sqliteDb.prepare(`
+    SELECT original_contract_value FROM projects WHERE id = ?
+  `).get(projectId);
+  
+  if (!project) {
+    return { success: false, error: 'Project not found' };
+  }
+  
   const approvedCOs = sqliteDb.prepare(`
     SELECT total FROM change_orders 
     WHERE project_id = ? AND status = 'approved' AND deleted_at IS NULL
   `).all(projectId);
   
   const coTotal = approvedCOs.reduce((sum, co) => sum + (co.total || 0), 0);
+  
+  const newContractValue = project.original_contract_value + coTotal;
+  
+  sqliteDb.prepare(`
+    UPDATE projects 
+    SET current_contract_value = ?, updated_at = ?
+    WHERE id = ?
+  `).run(newContractValue, new Date().toISOString(), projectId);
   
   const costCodes = sqliteDb.prepare(`
     SELECT id, budget_amount FROM cost_codes 
@@ -1407,7 +1423,13 @@ async function recalculateProjectBudget(projectId) {
     }
   }
   
-  return { success: true };
+  logAudit('project', projectId, 'budget-recalculation', projectId, {
+    original_value: project.original_contract_value,
+    change_order_total: coTotal,
+    new_contract_value: newContractValue
+  });
+  
+  return { success: true, data: { original_value: project.original_contract_value, change_order_total: coTotal, new_contract_value: newContractValue } };
 }
 
 async function calculateAutomatedSOV(projectId) {
@@ -1455,6 +1477,81 @@ async function calculateAutomatedSOV(projectId) {
   return { success: true, data: sovItems };
 }
 
+async function getProjectFinancialSummary(projectId) {
+  const sqliteDb = getSQLiteDB();
+  
+  const project = sqliteDb.prepare(`
+    SELECT original_contract_value, current_contract_value 
+    FROM projects WHERE id = ?
+  `).get(projectId);
+  
+  if (!project) {
+    return { success: false, error: 'Project not found' };
+  }
+  
+  const approvedCOs = sqliteDb.prepare(`
+    SELECT id, number, title, total, approved_date 
+    FROM change_orders 
+    WHERE project_id = ? AND status = 'approved' AND deleted_at IS NULL
+    ORDER BY approved_date DESC
+  `).all(projectId);
+  
+  const pendingCOs = sqliteDb.prepare(`
+    SELECT id, number, title, total, requested_date 
+    FROM change_orders 
+    WHERE project_id = ? AND status IN ('draft', 'submitted', 'under-review') AND deleted_at IS NULL
+    ORDER BY requested_date DESC
+  `).all(projectId);
+  
+  const costCodeTotals = sqliteDb.prepare(`
+    SELECT 
+      SUM(budget_amount) as total_budget,
+      SUM(actual_amount) as total_actual
+    FROM cost_codes 
+    WHERE project_id = ? AND deleted_at IS NULL
+  `).get(projectId);
+  
+  const coTotal = approvedCOs.reduce((sum, co) => sum + (co.total || 0), 0);
+  const pendingCoTotal = pendingCOs.reduce((sum, co) => sum + (co.total || 0), 0);
+  
+  return {
+    success: true,
+    data: {
+      original_contract_value: project.original_contract_value || 0,
+      current_contract_value: project.current_contract_value || 0,
+      approved_change_order_total: coTotal,
+      pending_change_order_total: pendingCoTotal,
+      potential_contract_value: (project.current_contract_value || 0) + pendingCoTotal,
+      total_budget: costCodeTotals?.total_budget || 0,
+      total_actual: costCodeTotals?.total_actual || 0,
+      approved_change_orders: approvedCOs,
+      pending_change_orders: pendingCOs,
+    }
+  };
+}
+
+async function updateProjectContractValue(projectId, originalValue) {
+  const sqliteDb = getSQLiteDB();
+  const now = new Date().toISOString();
+  
+  const project = sqliteDb.prepare('SELECT id FROM projects WHERE id = ?').get(projectId);
+  if (!project) {
+    return { success: false, error: 'Project not found' };
+  }
+  
+  sqliteDb.prepare(`
+    UPDATE projects 
+    SET original_contract_value = ?, updated_at = ?
+    WHERE id = ?
+  `).run(originalValue, now, projectId);
+  
+  await recalculateProjectBudget(projectId);
+  
+  logAudit('project', projectId, 'contract-value-update', projectId, { original_value: originalValue });
+  
+  return { success: true };
+}
+
 module.exports = {
   createRFI,
   listRFIs,
@@ -1499,4 +1596,7 @@ module.exports = {
   updateContract,
   deleteContract,
   calculateAutomatedSOV,
+  recalculateProjectBudget,
+  getProjectFinancialSummary,
+  updateProjectContractValue,
 };

@@ -41,6 +41,8 @@ function createTablesIfNotExists() {
       end_date TEXT,
       client_name TEXT,
       location TEXT,
+      original_contract_value REAL NOT NULL DEFAULT 0,
+      current_contract_value REAL NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       created_by TEXT,
@@ -273,6 +275,28 @@ function createTablesIfNotExists() {
     CREATE INDEX IF NOT EXISTS idx_change_orders_status ON change_orders(status);
     CREATE INDEX IF NOT EXISTS idx_contracts_project_id ON contracts(project_id);
   `);
+  
+  migrateSchema();
+}
+
+function migrateSchema() {
+  try {
+    const columns = sqliteDb.prepare("PRAGMA table_info(projects)").all();
+    const hasOriginalContractValue = columns.some(col => col.name === 'original_contract_value');
+    const hasCurrentContractValue = columns.some(col => col.name === 'current_contract_value');
+    
+    if (!hasOriginalContractValue) {
+      sqliteDb.exec('ALTER TABLE projects ADD COLUMN original_contract_value REAL NOT NULL DEFAULT 0');
+      console.log('Added original_contract_value column to projects table');
+    }
+    
+    if (!hasCurrentContractValue) {
+      sqliteDb.exec('ALTER TABLE projects ADD COLUMN current_contract_value REAL NOT NULL DEFAULT 0');
+      console.log('Added current_contract_value column to projects table');
+    }
+  } catch (error) {
+    console.error('Schema migration error:', error);
+  }
 }
 
 function getDatabase() {
