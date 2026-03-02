@@ -344,6 +344,21 @@ export interface InvoiceLineItem {
   amount: number
 }
 
+export interface Expense {
+  id: string
+  projectId: string
+  date: string
+  amount: number
+  category: string
+  vendor: string
+  description: string
+  status: 'pending' | 'approved' | 'paid' | 'rejected'
+  receiptUrl?: string
+  approvedBy?: string
+  approvedDate?: string
+  createdAt: string
+}
+
 export interface RFI {
   id: string
   projectId: string

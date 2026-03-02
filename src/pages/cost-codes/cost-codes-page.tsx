@@ -1,22 +1,333 @@
+import { useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Plus, Tag, PencilSimple, Trash } from '@phosphor-icons/react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useKV } from '@github/spark/hooks'
+import { toast } from 'sonner'
+import type { CostCode } from '@/lib/types'
 
 export function CostCodesPage() {
   const { projectId } = useParams()
+  const [costCodes, setCostCodes] = useKV<CostCode[]>(`cost-codes-${projectId}`, [])
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [isEditOpen, setIsEditOpen] = useState(false)
+  const [editingCode, setEditingCode] = useState<CostCode | null>(null)
+  const [formData, setFormData] = useState({
+    code: '',
+    name: '',
+    category: 'labor' as CostCode['category'],
+    budgetAmount: '',
+  })
+
+  const totalBudget = costCodes?.reduce((sum, cc) => sum + (cc.budgetAmount || 0), 0) || 0
+  const totalActual = costCodes?.reduce((sum, cc) => sum + (cc.actualAmount || 0), 0) || 0
+
+  const handleCreate = () => {
+    if (!formData.code || !formData.name) {
+      toast.error('Please fill in required fields')
+      return
+    }
+
+    const newCode: CostCode = {
+      id: crypto.randomUUID(),
+      code: formData.code,
+      name: formData.name,
+      category: formData.category,
+      projectId,
+      budgetAmount: formData.budgetAmount ? parseFloat(formData.budgetAmount) : undefined,
+      actualAmount: 0,
+      createdAt: new Date().toISOString(),
+    }
+
+    setCostCodes(current => [...(current || []), newCode])
+    setIsCreateOpen(false)
+    setFormData({ code: '', name: '', category: 'labor', budgetAmount: '' })
+    toast.success('Cost code created')
+  }
+
+  const handleEdit = (code: CostCode) => {
+    setEditingCode(code)
+    setFormData({
+      code: code.code,
+      name: code.name,
+      category: code.category,
+      budgetAmount: code.budgetAmount?.toString() || '',
+    })
+    setIsEditOpen(true)
+  }
+
+  const handleUpdate = () => {
+    if (!formData.code || !formData.name || !editingCode) {
+      toast.error('Please fill in required fields')
+      return
+    }
+
+    setCostCodes(current =>
+      (current || []).map(code =>
+        code.id === editingCode.id
+          ? {
+              ...code,
+              code: formData.code,
+              name: formData.name,
+              category: formData.category,
+              budgetAmount: formData.budgetAmount ? parseFloat(formData.budgetAmount) : undefined,
+            }
+          : code
+      )
+    )
+    setIsEditOpen(false)
+    setEditingCode(null)
+    setFormData({ code: '', name: '', category: 'labor', budgetAmount: '' })
+    toast.success('Cost code updated')
+  }
+
+  const handleDelete = (codeId: string) => {
+    setCostCodes(current => (current || []).filter(c => c.id !== codeId))
+    toast.success('Cost code deleted')
+  }
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Cost Codes</h2>
+          <p className="text-muted-foreground">Manage project cost codes and budgets</p>
+        </div>
+        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="mr-2" />
+              New Cost Code
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create Cost Code</DialogTitle>
+              <DialogDescription>Add a new cost code to this project</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="code">Code</Label>
+                  <Input
+                    id="code"
+                    value={formData.code}
+                    onChange={e => setFormData(prev => ({ ...prev, code: e.target.value }))}
+                    placeholder="01-1000"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="category">Category</Label>
+                  <Select value={formData.category} onValueChange={v => setFormData(prev => ({ ...prev, category: v as CostCode['category'] }))}>
+                    <SelectTrigger id="category">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="labor">Labor</SelectItem>
+                      <SelectItem value="material">Material</SelectItem>
+                      <SelectItem value="equipment">Equipment</SelectItem>
+                      <SelectItem value="subcontractor">Subcontractor</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="name">Name</Label>
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="Cost code name"
+                />
+              </div>
+              <div>
+                <Label htmlFor="budget">Budget Amount (Optional)</Label>
+                <Input
+                  id="budget"
+                  type="number"
+                  step="0.01"
+                  value={formData.budgetAmount}
+                  onChange={e => setFormData(prev => ({ ...prev, budgetAmount: e.target.value }))}
+                  placeholder="0.00"
+                />
+              </div>
+              <Button onClick={handleCreate} className="w-full">Create Cost Code</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Cost Codes</CardTitle>
+            <Tag className="text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{costCodes?.length || 0}</div>
+            <p className="text-xs text-muted-foreground">Active codes</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Budget</CardTitle>
+            <Tag className="text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">${totalBudget.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">Budgeted</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Actual</CardTitle>
+            <Tag className="text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">${totalActual.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">Spent</p>
+          </CardContent>
+        </Card>
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle>Cost Codes</CardTitle>
+          <CardDescription>All cost codes for this project</CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">Project ID: {projectId}</p>
-          <p className="text-sm text-muted-foreground mt-2">
-            Cost Codes content coming soon...
-          </p>
+          {!costCodes || costCodes.length === 0 ? (
+            <div className="text-center py-12">
+              <Tag className="mx-auto text-muted-foreground mb-4" size={48} />
+              <p className="text-muted-foreground mb-4">No cost codes yet</p>
+              <Button onClick={() => setIsCreateOpen(true)}>
+                <Plus className="mr-2" />
+                Create First Cost Code
+              </Button>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Code</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead className="text-right">Budget</TableHead>
+                  <TableHead className="text-right">Actual</TableHead>
+                  <TableHead className="text-right">Variance</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {costCodes.map(code => {
+                  const variance = (code.budgetAmount || 0) - (code.actualAmount || 0)
+                  return (
+                    <TableRow key={code.id}>
+                      <TableCell className="font-medium font-mono">{code.code}</TableCell>
+                      <TableCell>{code.name}</TableCell>
+                      <TableCell className="capitalize">{code.category}</TableCell>
+                      <TableCell className="text-right">${(code.budgetAmount || 0).toLocaleString()}</TableCell>
+                      <TableCell className="text-right">${(code.actualAmount || 0).toLocaleString()}</TableCell>
+                      <TableCell className={`text-right font-medium ${variance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        ${variance.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button variant="ghost" size="sm" onClick={() => handleEdit(code)}>
+                            <PencilSimple />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <Trash />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Cost Code</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDelete(code.id)}>Delete</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
+
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Cost Code</DialogTitle>
+            <DialogDescription>Update cost code details</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit-code">Code</Label>
+                <Input
+                  id="edit-code"
+                  value={formData.code}
+                  onChange={e => setFormData(prev => ({ ...prev, code: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-category">Category</Label>
+                <Select value={formData.category} onValueChange={v => setFormData(prev => ({ ...prev, category: v as CostCode['category'] }))}>
+                  <SelectTrigger id="edit-category">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="labor">Labor</SelectItem>
+                    <SelectItem value="material">Material</SelectItem>
+                    <SelectItem value="equipment">Equipment</SelectItem>
+                    <SelectItem value="subcontractor">Subcontractor</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="edit-name">Name</Label>
+              <Input
+                id="edit-name"
+                value={formData.name}
+                onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-budget">Budget Amount</Label>
+              <Input
+                id="edit-budget"
+                type="number"
+                step="0.01"
+                value={formData.budgetAmount}
+                onChange={e => setFormData(prev => ({ ...prev, budgetAmount: e.target.value }))}
+              />
+            </div>
+            <Button onClick={handleUpdate} className="w-full">Update Cost Code</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
