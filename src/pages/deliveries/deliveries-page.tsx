@@ -119,12 +119,13 @@ export function DeliveriesPage() {
   const delayedDeliveries = deliveries?.filter(d => d.status === 'delayed').length || 0
 
   return (
-    <div className="space-y-6 animate-in">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">Deliveries</h2>
-          <p className="text-muted-foreground">Material delivery tracking and scheduling</p>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-background to-red-50">
+      <div className="space-y-6 p-6 animate-in">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">Deliveries</h2>
+            <p className="text-muted-foreground">Material delivery tracking and scheduling</p>
+          </div>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>
             <Button>
@@ -347,6 +348,7 @@ export function DeliveriesPage() {
           )}
         </CardContent>
       </Card>
+      </div>
     </div>
   )
 }

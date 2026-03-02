@@ -71,12 +71,13 @@ export function DocumentsPage() {
   }, {} as Record<string, Document[]>) || {}
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Documents</h2>
-          <p className="text-muted-foreground">Project documentation and files</p>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-background to-indigo-50">
+      <div className="space-y-6 p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">Documents</h2>
+            <p className="text-muted-foreground">Project documentation and files</p>
+          </div>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>
             <Button>
@@ -272,6 +273,7 @@ export function DocumentsPage() {
           )}
         </CardContent>
       </Card>
+      </div>
     </div>
   )
 }

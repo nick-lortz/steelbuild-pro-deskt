@@ -191,12 +191,13 @@ export function LaborPage() {
   }
 
   return (
-    <div className="space-y-6 animate-in">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">Labor</h2>
-          <p className="text-muted-foreground">Track labor hours and costs</p>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-teal-50 via-background to-cyan-50">
+      <div className="space-y-6 p-6 animate-in">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">Labor</h2>
+            <p className="text-muted-foreground">Track labor hours and costs</p>
+          </div>
         <div className="flex gap-2">
           <Dialog open={isCategoryOpen} onOpenChange={setIsCategoryOpen}>
             <DialogTrigger asChild>
@@ -579,6 +580,7 @@ export function LaborPage() {
           </div>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   )
 }

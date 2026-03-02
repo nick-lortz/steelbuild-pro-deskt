@@ -158,12 +158,13 @@ export function RFIsPage() {
   const escalatedRFIs = rfis?.filter(r => r.status === 'escalated').length || 0
 
   return (
-    <div className="space-y-6 animate-in">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">RFIs</h2>
-          <p className="text-muted-foreground">Request for Information management</p>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-background to-orange-50">
+      <div className="space-y-6 p-6 animate-in">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">RFIs</h2>
+            <p className="text-muted-foreground">Request for Information management</p>
+          </div>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>
             <Button>
@@ -480,6 +481,7 @@ export function RFIsPage() {
           )}
         </CardContent>
       </Card>
+      </div>
     </div>
   )
 }
