@@ -1,6 +1,6 @@
 import { Outlet, Link, useLocation } from 'react-router-dom'
 import { useState } from 'react'
-import { Buildings, Robot, ChartBar, Wrench, CurrencyDollar, ClipboardText } from '@phosphor-icons/react'
+import { Buildings, Robot, ChartBar, Wrench, CurrencyDollar, ClipboardText, Gear } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { PMAPanel } from '@/components/pma/pma-panel'
 
@@ -12,25 +12,28 @@ export function MainLayout() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-40 w-full border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
+      <header className="sticky top-0 z-50 w-full border-b bg-card/80 backdrop-blur-xl supports-[backdrop-filter]:bg-card/60 shadow-sm">
         <div className="container flex h-16 items-center justify-between px-6">
           <div className="flex items-center gap-8">
-            <Link to="/" className="flex items-center gap-3">
-              <Buildings size={32} weight="duotone" className="text-primary" />
+            <Link to="/" className="flex items-center gap-3 group">
+              <div className="relative">
+                <Buildings size={36} weight="duotone" className="text-primary transition-transform group-hover:scale-105" />
+                <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
               <div>
-                <h1 className="text-xl font-bold leading-none">SteelBuild Pro</h1>
-                <p className="text-xs text-muted-foreground">Construction Management</p>
+                <h1 className="text-xl font-bold leading-none tracking-tight">SteelBuild Pro</h1>
+                <p className="text-xs text-muted-foreground font-medium">Construction Management</p>
               </div>
             </Link>
             
-            <nav className="hidden md:flex items-center gap-1">
+            <nav className="hidden lg:flex items-center gap-1">
               <Link to="/">
                 <Button
                   variant={isActive('/') && location.pathname === '/' ? 'secondary' : 'ghost'}
                   size="sm"
-                  className="gap-2"
+                  className="gap-2 font-medium"
                 >
-                  <ChartBar size={18} />
+                  <ChartBar size={18} weight={isActive('/') && location.pathname === '/' ? 'fill' : 'regular'} />
                   Dashboard
                 </Button>
               </Link>
@@ -38,9 +41,9 @@ export function MainLayout() {
                 <Button
                   variant={isActive('/projects') ? 'secondary' : 'ghost'}
                   size="sm"
-                  className="gap-2"
+                  className="gap-2 font-medium"
                 >
-                  <Buildings size={18} />
+                  <Buildings size={18} weight={isActive('/projects') ? 'fill' : 'regular'} />
                   Projects
                 </Button>
               </Link>
@@ -48,9 +51,9 @@ export function MainLayout() {
                 <Button
                   variant={isActive('/portfolio') ? 'secondary' : 'ghost'}
                   size="sm"
-                  className="gap-2"
+                  className="gap-2 font-medium"
                 >
-                  <ChartBar size={18} />
+                  <ChartBar size={18} weight={isActive('/portfolio') ? 'fill' : 'regular'} />
                   Portfolio
                 </Button>
               </Link>
@@ -58,9 +61,9 @@ export function MainLayout() {
                 <Button
                   variant={isActive('/equipment') ? 'secondary' : 'ghost'}
                   size="sm"
-                  className="gap-2"
+                  className="gap-2 font-medium"
                 >
-                  <Wrench size={18} />
+                  <Wrench size={18} weight={isActive('/equipment') ? 'fill' : 'regular'} />
                   Equipment
                 </Button>
               </Link>
@@ -68,9 +71,9 @@ export function MainLayout() {
                 <Button
                   variant={isActive('/cost-codes') ? 'secondary' : 'ghost'}
                   size="sm"
-                  className="gap-2"
+                  className="gap-2 font-medium"
                 >
-                  <CurrencyDollar size={18} />
+                  <CurrencyDollar size={18} weight={isActive('/cost-codes') ? 'fill' : 'regular'} />
                   Cost Codes
                 </Button>
               </Link>
@@ -78,9 +81,9 @@ export function MainLayout() {
                 <Button
                   variant={isActive('/audit') ? 'secondary' : 'ghost'}
                   size="sm"
-                  className="gap-2"
+                  className="gap-2 font-medium"
                 >
-                  <ClipboardText size={18} />
+                  <ClipboardText size={18} weight={isActive('/audit') ? 'fill' : 'regular'} />
                   Audit
                 </Button>
               </Link>
@@ -88,14 +91,24 @@ export function MainLayout() {
           </div>
           
           <div className="flex items-center gap-2">
+            <Link to="/settings">
+              <Button
+                variant={isActive('/settings') ? 'secondary' : 'ghost'}
+                size="sm"
+                className="gap-2"
+              >
+                <Gear size={18} weight={isActive('/settings') ? 'fill' : 'regular'} />
+                <span className="hidden sm:inline">Settings</span>
+              </Button>
+            </Link>
             <Button
               variant="outline"
               size="sm"
               onClick={() => setPmaOpen(true)}
-              className="gap-2"
+              className="gap-2 border-primary/20 hover:bg-primary/5 hover:text-primary hover:border-primary/40 transition-all"
             >
-              <Robot size={18} />
-              <span className="hidden sm:inline">PMA</span>
+              <Robot size={18} weight="duotone" />
+              <span className="hidden sm:inline font-medium">PMA</span>
             </Button>
           </div>
         </div>

@@ -35,6 +35,7 @@ import { FabricationTrackingPage } from '@/pages/fabrication/fabrication-trackin
 import { LookAheadPlanningPage } from '@/pages/lookahead/lookahead-planning-page'
 import { ProjectContactsPage } from '@/pages/contacts/project-contacts-page'
 import { JobSetupPage } from '@/pages/job-setup/job-setup-page'
+import { SettingsPage } from '@/pages/global/settings-page'
 
 export const router = createBrowserRouter([
   {
@@ -64,6 +65,10 @@ export const router = createBrowserRouter([
       {
         path: 'audit',
         element: <AuditDashboardPage />,
+      },
+      {
+        path: 'settings',
+        element: <SettingsPage />,
       },
       {
         path: 'projects/:projectId',
