@@ -1,6 +1,6 @@
 import { Outlet, Link, useLocation } from 'react-router-dom'
 import { useState } from 'react'
-import { Buildings, Robot, ChartBar, Package, Pencil, Factory, Truck, Crane } from '@phosphor-icons/react'
+import { Buildings, Robot, ChartBar, Package, Pencil, Factory, Truck, Crane, Gear } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { PMAPanel } from '@/components/pma/pma-panel'
 import { OfflineIndicator } from '@/components/shared/offline-indicator'
@@ -30,7 +30,7 @@ export function MainLayout() {
               </div>
             </Link>
             
-            <nav className="hidden lg:flex items-center gap-1">
+            <nav className="hidden xl:flex items-center gap-1">
               <Link to="/">
                 <Button
                   variant={isActive('/') && location.pathname === '/' ? 'secondary' : 'ghost'}

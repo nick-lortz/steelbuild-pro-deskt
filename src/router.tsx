@@ -43,6 +43,7 @@ import { SettingsPage } from '@/pages/global/settings-page'
 import { PMAPage } from '@/pages/projects/pma-page'
 import { PMADailyBriefPage } from '@/pages/projects/pma-daily-brief-page'
 import { DetailingPage } from '@/pages/detailing/detailing-page'
+import { WorkflowDashboardPage } from '@/pages/workflow/workflow-dashboard-page'
 
 export const router = createBrowserRouter([
   {
@@ -216,6 +217,10 @@ export const router = createBrowserRouter([
           {
             path: 'detailing',
             element: <DetailingPage />,
+          },
+          {
+            path: 'workflow',
+            element: <WorkflowDashboardPage />,
           },
         ],
       },
