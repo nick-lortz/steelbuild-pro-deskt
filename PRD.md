@@ -63,12 +63,12 @@ This is a multi-module construction ERP system with project hierarchies, cost tr
 - **Progression**: Template Selection → Checklist Instance → Toggle Items → Mark Complete → Archive
 - **Success criteria**: Full CRUD on items, completion state persists, templates are reusable
 
-### Project Management Assistant (PMA)
-- **Functionality**: AI-powered assistant for project insights, schedule analysis, and decision support
-- **Purpose**: Proactive recommendations and intelligent summaries
-- **Trigger**: User clicks PMA icon or asks question in chat interface
-- **Progression**: Open PMA Panel → Enter Query → LLM Analysis → Contextual Response → Suggested Actions
-- **Success criteria**: End-to-end functional, returns useful responses, handles loading/error states
+### Project Management Assistant (PMA) - Daily Brief
+- **Functionality**: AI-powered heuristic engine that scans project data for aging RFIs (72+ hours), schedule slippage (actual vs baseline dates), and budget overages (actual > budget)
+- **Purpose**: Proactive risk detection and intelligent insights to keep projects on track
+- **Trigger**: User navigates to PMA Daily Brief page, clicks "Run Scan"
+- **Progression**: Load Insights → Display Summary Cards → Filter by Category (RFIs/Schedule/Budget) → Review Details → Resolve or Dismiss Insights → Track History
+- **Success criteria**: Accurate detection of aging RFIs, schedule delays, and cost overruns; clear categorization by severity; deep-linking to related entities; resolve/dismiss workflow with audit trail
 
 ### Budget Tracking & Cost Forecasting
 - **Functionality**: Real-time budget analysis with AI-powered cost projections and variance tracking
