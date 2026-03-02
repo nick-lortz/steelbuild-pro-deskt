@@ -512,3 +512,17 @@ export const tasksDb = {
     )
   },
 }
+
+export const db = {
+  projects: projectsDb,
+  costCodes: costCodesDb,
+  changeOrders: changeOrdersDb,
+  contracts: contractsDb,
+  drawingSets: drawingSetsDb,
+  equipment: equipmentDb,
+  checklistTemplates: checklistTemplatesDb,
+  checklists: checklistsDb,
+  rfis: rfisDb,
+  equipmentLogs: equipmentLogsDb,
+  tasks: tasksDb,
+}
