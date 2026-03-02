@@ -1,6 +1,6 @@
 import { Outlet, Link, useLocation } from 'react-router-dom'
 import { useState } from 'react'
-import { Buildings, Robot, ChartBar, Wrench, CurrencyDollar, ClipboardText, Gear } from '@phosphor-icons/react'
+import { Buildings, Robot, ChartBar, Package, Pencil, Factory, Truck, Crane } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { PMAPanel } from '@/components/pma/pma-panel'
 import { OfflineIndicator } from '@/components/shared/offline-indicator'

@@ -42,6 +42,7 @@ import { JobSetupPage } from '@/pages/job-setup/job-setup-page'
 import { SettingsPage } from '@/pages/global/settings-page'
 import { PMAPage } from '@/pages/projects/pma-page'
 import { PMADailyBriefPage } from '@/pages/projects/pma-daily-brief-page'
+import { DetailingPage } from '@/pages/detailing/detailing-page'
 
 export const router = createBrowserRouter([
   {
@@ -211,6 +212,10 @@ export const router = createBrowserRouter([
           {
             path: 'pma',
             element: <PMADailyBriefPage />,
+          },
+          {
+            path: 'detailing',
+            element: <DetailingPage />,
           },
         ],
       },

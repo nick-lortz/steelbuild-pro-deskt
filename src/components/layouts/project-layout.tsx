@@ -107,8 +107,8 @@ export function ProjectLayout() {
               <span className="hidden sm:inline">Work Packages</span>
             </TabsTrigger>
           </Link>
-          <Link to={`/projects/${projectId}/drawings`}>
-            <TabsTrigger value="drawings" className="w-full gap-1.5">
+          <Link to={`/projects/${projectId}/detailing`}>
+            <TabsTrigger value="detailing" className="w-full gap-1.5">
               <Stack size={16} />
               <span className="hidden sm:inline">Detailing</span>
             </TabsTrigger>
@@ -152,6 +152,12 @@ export function ProjectLayout() {
         </TabsList>
 
         <div className="flex gap-2 overflow-x-auto pb-2">
+          <Link to={`/projects/${projectId}/drawings`}>
+            <Button variant={activeTab === 'drawings' ? 'secondary' : 'outline'} size="sm" className="gap-2">
+              <Stack size={16} />
+              Drawings
+            </Button>
+          </Link>
           <Link to={`/projects/${projectId}/documents`}>
             <Button variant={activeTab === 'documents' ? 'secondary' : 'outline'} size="sm" className="gap-2">
               <FileText size={16} />
