@@ -146,6 +146,33 @@ export interface DBResult<T = any> {
   error?: string;
 }
 
+export interface FileUploadData {
+  fileName: string;
+  fileBuffer: ArrayBuffer;
+  projectId: string;
+}
+
+export interface FileUploadResult {
+  fileKey: string;
+  filePath: string;
+  fileName: string;
+  originalName: string;
+  size: number;
+}
+
+export interface FileDownloadResult {
+  buffer: number[];
+  fileName: string;
+  mimeType: string;
+}
+
+export interface SBPFile {
+  uploadDrawing: (fileData: FileUploadData) => Promise<DBResult<FileUploadResult>>;
+  downloadDrawing: (fileKey: string) => Promise<DBResult<FileDownloadResult>>;
+  deleteDrawing: (fileKey: string) => Promise<DBResult>;
+  openDrawing: (fileKey: string) => Promise<DBResult>;
+}
+
 export interface SBPDB {
   init: () => Promise<DBResult<{ path: string }>>;
   createRFI: (data: Partial<RFI>) => Promise<DBResult<RFI>>;
@@ -188,6 +215,7 @@ declare global {
   interface Window {
     SBP?: {
       db: SBPDB;
+      file: SBPFile;
     };
   }
 }

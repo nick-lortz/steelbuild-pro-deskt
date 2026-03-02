@@ -317,6 +317,137 @@ ipcMain.handle("fs:readFile", async (event, filePath) => {
   }
 });
 
+ipcMain.handle("file:uploadDrawing", async (event, fileData) => {
+  try {
+    const userDataPath = app.getPath("userData");
+    const drawingsDir = path.join(userDataPath, "drawings");
+    
+    if (!fs.existsSync(drawingsDir)) {
+      fs.mkdirSync(drawingsDir, { recursive: true });
+    }
+    
+    const { fileName, fileBuffer, projectId } = fileData;
+    const projectDir = path.join(drawingsDir, projectId);
+    
+    if (!fs.existsSync(projectDir)) {
+      fs.mkdirSync(projectDir, { recursive: true });
+    }
+    
+    const timestamp = Date.now();
+    const safeFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const uniqueFileName = `${timestamp}_${safeFileName}`;
+    const filePath = path.join(projectDir, uniqueFileName);
+    
+    const buffer = Buffer.from(fileBuffer);
+    fs.writeFileSync(filePath, buffer);
+    
+    const fileKey = path.join(projectId, uniqueFileName);
+    
+    return {
+      success: true,
+      data: {
+        fileKey,
+        filePath,
+        fileName: safeFileName,
+        originalName: fileName,
+        size: buffer.length,
+      }
+    };
+  } catch (error) {
+    console.error("File upload error:", error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("file:downloadDrawing", async (event, fileKey) => {
+  try {
+    const userDataPath = app.getPath("userData");
+    const drawingsDir = path.join(userDataPath, "drawings");
+    const filePath = path.join(drawingsDir, fileKey);
+    
+    if (!filePath.startsWith(drawingsDir)) {
+      throw new Error("File access denied: Invalid file path");
+    }
+    
+    if (!fs.existsSync(filePath)) {
+      throw new Error("File not found");
+    }
+    
+    const buffer = fs.readFileSync(filePath);
+    const fileName = path.basename(filePath);
+    
+    return {
+      success: true,
+      data: {
+        buffer: Array.from(buffer),
+        fileName,
+        mimeType: getMimeType(fileName),
+      }
+    };
+  } catch (error) {
+    console.error("File download error:", error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("file:deleteDrawing", async (event, fileKey) => {
+  try {
+    const userDataPath = app.getPath("userData");
+    const drawingsDir = path.join(userDataPath, "drawings");
+    const filePath = path.join(drawingsDir, fileKey);
+    
+    if (!filePath.startsWith(drawingsDir)) {
+      throw new Error("File access denied: Invalid file path");
+    }
+    
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error("File delete error:", error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("file:openDrawing", async (event, fileKey) => {
+  try {
+    const userDataPath = app.getPath("userData");
+    const drawingsDir = path.join(userDataPath, "drawings");
+    const filePath = path.join(drawingsDir, fileKey);
+    
+    if (!filePath.startsWith(drawingsDir)) {
+      throw new Error("File access denied: Invalid file path");
+    }
+    
+    if (!fs.existsSync(filePath)) {
+      throw new Error("File not found");
+    }
+    
+    await shell.openPath(filePath);
+    return { success: true };
+  } catch (error) {
+    console.error("File open error:", error);
+    return { success: false, error: error.message };
+  }
+});
+
+function getMimeType(fileName) {
+  const ext = path.extname(fileName).toLowerCase();
+  const mimeTypes = {
+    '.pdf': 'application/pdf',
+    '.dwg': 'application/acad',
+    '.dxf': 'application/dxf',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.tif': 'image/tiff',
+    '.tiff': 'image/tiff',
+  };
+  return mimeTypes[ext] || 'application/octet-stream';
+}
+
 ipcMain.handle("db:init", async () => {
   try {
     const userDataPath = app.getPath("userData");

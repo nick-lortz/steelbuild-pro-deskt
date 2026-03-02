@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   Plus,
@@ -8,6 +8,9 @@ import {
   Upload,
   Check,
   X,
+  DownloadSimple,
+  Trash,
+  FolderOpen,
 } from '@phosphor-icons/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -18,7 +21,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useDrawingSets, useNotifications } from '@/hooks/use-drawings'
+import { useDrawingSets, useNotifications, useDrawingSheets } from '@/hooks/use-drawings'
+import { FileUploadWithProgress } from '@/components/shared/FileUpload'
+import { DrawingSheetViewer } from '@/components/shared/DrawingSheetViewer'
 import { toast } from 'sonner'
 import type { DrawingSet, DrawingSheet } from '@/types/electron'
 
@@ -48,6 +53,11 @@ export function DrawingsDBPage() {
   const [isCreateSetOpen, setIsCreateSetOpen] = useState(false)
   const [isAddSheetOpen, setIsAddSheetOpen] = useState(false)
   const [selectedSet, setSelectedSet] = useState<DrawingSet | null>(null)
+  const [viewSheetsSetId, setViewSheetsSetId] = useState<string | null>(null)
+  const { drawingSheets, loading: sheetsLoading, deleteDrawingSheet } = useDrawingSheets(viewSheetsSetId || undefined)
+  const [uploadingFile, setUploadingFile] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
 
   const [setFormData, setSetFormData] = useState({
     name: '',
@@ -61,6 +71,15 @@ export function DrawingsDBPage() {
     title: '',
     status: 'IFA' as DrawingSheet['status'],
   })
+
+  const handleDeleteSheet = async (sheetId: string) => {
+    const result = await deleteDrawingSheet(sheetId)
+    if (result.success) {
+      toast.success('Sheet deleted successfully')
+    } else {
+      toast.error(result.error || 'Failed to delete sheet')
+    }
+  }
 
   const handleCreateSet = async () => {
     if (!setFormData.name) {
@@ -94,14 +113,52 @@ export function DrawingsDBPage() {
       return
     }
 
+    let fileKey: string | undefined = undefined
+
+    if (selectedFile && window.SBP?.file && projectId) {
+      try {
+        setUploadingFile(true)
+        setUploadProgress(30)
+
+        const arrayBuffer = await selectedFile.arrayBuffer()
+        
+        setUploadProgress(60)
+
+        const uploadResult = await window.SBP.file.uploadDrawing({
+          fileName: selectedFile.name,
+          fileBuffer: arrayBuffer,
+          projectId,
+        })
+
+        setUploadProgress(90)
+
+        if (!uploadResult.success || !uploadResult.data) {
+          throw new Error(uploadResult.error || 'Failed to upload file')
+        }
+
+        fileKey = uploadResult.data.fileKey
+        setUploadProgress(100)
+      } catch (error) {
+        setUploadingFile(false)
+        setUploadProgress(0)
+        toast.error(error instanceof Error ? error.message : 'Failed to upload file')
+        return
+      }
+    }
+
     const result = await window.SBP.db.createDrawingSheet({
       set_id: selectedSet.id,
       ...sheetFormData,
+      file_key: fileKey,
     })
+
+    setUploadingFile(false)
+    setUploadProgress(0)
 
     if (result.success) {
       setIsAddSheetOpen(false)
       setSelectedSet(null)
+      setSelectedFile(null)
       setSheetFormData({
         sheet_no: '',
         title: '',
@@ -292,6 +349,7 @@ export function DrawingsDBPage() {
       <Tabs defaultValue="sets" className="space-y-4">
         <TabsList>
           <TabsTrigger value="sets">Drawing Sets</TabsTrigger>
+          <TabsTrigger value="sheets">All Sheets</TabsTrigger>
           <TabsTrigger value="notifications">
             Notifications
             {unreadNotifications.length > 0 && (
@@ -397,6 +455,58 @@ export function DrawingsDBPage() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="sheets" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>All Drawing Sheets</CardTitle>
+              <CardDescription>View and manage all sheets across drawing sets</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex gap-2">
+                  <Select value={viewSheetsSetId || 'all'} onValueChange={(value) => setViewSheetsSetId(value === 'all' ? null : value)}>
+                    <SelectTrigger className="w-[280px]">
+                      <SelectValue placeholder="Filter by drawing set" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Sets</SelectItem>
+                      {drawingSets.map((set) => (
+                        <SelectItem key={set.id} value={set.id}>
+                          {set.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {sheetsLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="text-muted-foreground">Loading sheets...</div>
+                  </div>
+                ) : drawingSheets.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <FileText size={48} className="text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">No drawing sheets</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      {viewSheetsSetId ? 'This set has no sheets yet' : 'Add sheets to your drawing sets to see them here'}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid gap-3">
+                    {drawingSheets.map((sheet) => (
+                      <DrawingSheetViewer
+                        key={sheet.id}
+                        sheet={sheet}
+                        onDelete={handleDeleteSheet}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="notifications" className="space-y-4">
           <Card>
             <CardHeader>
@@ -447,7 +557,7 @@ export function DrawingsDBPage() {
       </Tabs>
 
       <Dialog open={isAddSheetOpen} onOpenChange={setIsAddSheetOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Add Drawing Sheet</DialogTitle>
             <DialogDescription>
@@ -491,12 +601,35 @@ export function DrawingsDBPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="grid gap-2">
+              <Label>Upload Drawing File (Optional)</Label>
+              <FileUploadWithProgress
+                onFileSelect={setSelectedFile}
+                accept=".pdf,.dwg,.dxf,.png,.jpg,.jpeg,.tif,.tiff"
+                maxSize={50 * 1024 * 1024}
+                uploading={uploadingFile}
+                progress={uploadProgress}
+                disabled={uploadingFile}
+              />
+              <p className="text-xs text-muted-foreground">
+                Supported formats: PDF, DWG, DXF, PNG, JPG, TIFF (Max 50MB)
+              </p>
+            </div>
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setIsAddSheetOpen(false)}>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setIsAddSheetOpen(false)
+                setSelectedFile(null)
+              }}
+              disabled={uploadingFile}
+            >
               Cancel
             </Button>
-            <Button onClick={handleAddSheet}>Add Sheet</Button>
+            <Button onClick={handleAddSheet} disabled={uploadingFile}>
+              {uploadingFile ? 'Uploading...' : 'Add Sheet'}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

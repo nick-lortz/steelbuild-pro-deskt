@@ -21,6 +21,13 @@ contextBridge.exposeInMainWorld("electronAPI", {
     readFile: (filePath) => ipcRenderer.invoke("fs:readFile", filePath),
   },
 
+  file: {
+    uploadDrawing: (fileData) => ipcRenderer.invoke("file:uploadDrawing", fileData),
+    downloadDrawing: (fileKey) => ipcRenderer.invoke("file:downloadDrawing", fileKey),
+    deleteDrawing: (fileKey) => ipcRenderer.invoke("file:deleteDrawing", fileKey),
+    openDrawing: (fileKey) => ipcRenderer.invoke("file:openDrawing", fileKey),
+  },
+
   db: {
     init: () => ipcRenderer.invoke("db:init"),
     createRFI: (data) => ipcRenderer.invoke("db:createRFI", data),
@@ -101,5 +108,11 @@ contextBridge.exposeInMainWorld("SBP", {
     listDrawingSheets: (setId, options) => ipcRenderer.invoke("db:listDrawingSheets", setId, options),
     updateDrawingSheetStatus: (id, newStatus, userId) => ipcRenderer.invoke("db:updateDrawingSheetStatus", id, newStatus, userId),
     deleteDrawingSheet: (id, userId) => ipcRenderer.invoke("db:deleteDrawingSheet", id, userId),
+  },
+  file: {
+    uploadDrawing: (fileData) => ipcRenderer.invoke("file:uploadDrawing", fileData),
+    downloadDrawing: (fileKey) => ipcRenderer.invoke("file:downloadDrawing", fileKey),
+    deleteDrawing: (fileKey) => ipcRenderer.invoke("file:deleteDrawing", fileKey),
+    openDrawing: (fileKey) => ipcRenderer.invoke("file:openDrawing", fileKey),
   },
 });
