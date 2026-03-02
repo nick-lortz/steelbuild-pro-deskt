@@ -276,12 +276,13 @@ export function SOVTrackingPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Schedule of Values (SOV)</h2>
-          <p className="text-muted-foreground">Track billing progress and payment applications</p>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-teal-50 via-background to-indigo-50">
+      <div className="space-y-6 p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight">Schedule of Values (SOV)</h2>
+            <p className="text-muted-foreground">Track billing progress and payment applications</p>
+          </div>
         <div className="flex gap-2">
           <Dialog open={isItemDialogOpen} onOpenChange={setIsItemDialogOpen}>
             <DialogTrigger asChild>
@@ -711,6 +712,7 @@ export function SOVTrackingPage() {
           </Card>
         </TabsContent>
       </Tabs>
+      </div>
     </div>
   )
 }

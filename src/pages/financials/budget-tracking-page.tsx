@@ -119,13 +119,14 @@ export function BudgetTrackingPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Budget Tracking & Forecasting</h2>
-          <p className="text-muted-foreground">Real-time cost analysis and projected completion estimates</p>
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-background to-orange-50">
+      <div className="space-y-6 p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight">Budget Tracking & Forecasting</h2>
+            <p className="text-muted-foreground">Real-time cost analysis and projected completion estimates</p>
+          </div>
         </div>
-      </div>
 
       <div className="grid gap-6 md:grid-cols-4">
         <Card>
@@ -417,6 +418,7 @@ export function BudgetTrackingPage() {
           </Card>
         </TabsContent>
       </Tabs>
+      </div>
     </div>
   )
 }

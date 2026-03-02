@@ -61,14 +61,15 @@ export function SchedulePage() {
   }, [tasks])
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Project Schedule</h1>
-          <p className="text-muted-foreground mt-1">
-            Plan, track, and visualize project tasks and dependencies
-          </p>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-violet-50 via-background to-cyan-50">
+      <div className="space-y-6 p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Project Schedule</h1>
+            <p className="text-muted-foreground mt-1">
+              Plan, track, and visualize project tasks and dependencies
+            </p>
+          </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" className="gap-2">
             <Funnel size={18} />
@@ -205,6 +206,7 @@ export function SchedulePage() {
           )}
         </CardContent>
       </Card>
+      </div>
     </div>
   )
 }

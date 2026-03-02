@@ -79,12 +79,13 @@ export function FinancialsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Financials</h2>
-          <p className="text-muted-foreground">Budget tracking and expense management</p>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-background to-blue-50">
+      <div className="space-y-6 p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight">Financials</h2>
+            <p className="text-muted-foreground">Budget tracking and expense management</p>
+          </div>
         <Dialog open={isExpenseDialogOpen} onOpenChange={setIsExpenseDialogOpen}>
           <DialogTrigger asChild>
             <Button>
@@ -411,6 +412,7 @@ export function FinancialsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+      </div>
     </div>
   )
 }
