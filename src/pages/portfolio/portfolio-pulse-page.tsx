@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useKV } from '@github/spark/hooks'
 import {
   BarChart,
@@ -67,6 +68,8 @@ export function PortfolioPulsePage() {
   const [metrics, setMetrics] = useState<PortfolioMetrics | null>(null)
   const [projectHealthData, setProjectHealthData] = useState<ProjectHealth[]>([])
   const [loading, setLoading] = useState(true)
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [healthFilter, setHealthFilter] = useState<string>('all')
 
   useEffect(() => {
     async function calculatePortfolioMetrics() {
@@ -191,7 +194,13 @@ export function PortfolioPulsePage() {
     { name: 'Completed', value: projects.filter(p => p.status === 'completed').length, color: 'hsl(var(--secondary))' },
   ].filter(item => item.value > 0) : []
 
-  const budgetPerformance = projectHealthData.map(h => ({
+  const filteredHealthData = projectHealthData.filter(h => {
+    if (statusFilter !== 'all' && h.project.status !== statusFilter) return false
+    if (healthFilter !== 'all' && h.status !== healthFilter) return false
+    return true
+  })
+
+  const budgetPerformance = filteredHealthData.map(h => ({
     name: h.project.name.substring(0, 15),
     health: Math.round(h.budgetHealth),
   }))
@@ -316,34 +325,69 @@ export function PortfolioPulsePage() {
         <TabsContent value="health" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Project Health Dashboard</CardTitle>
-              <CardDescription>Real-time status of all active projects</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Project Health Dashboard</CardTitle>
+                  <CardDescription>Real-time status of all active projects</CardDescription>
+                </div>
+                <div className="flex gap-2">
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="planning">Planning</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="onhold">On Hold</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={healthFilter} onValueChange={setHealthFilter}>
+                    <SelectTrigger className="w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Health</SelectItem>
+                      <SelectItem value="healthy">Healthy</SelectItem>
+                      <SelectItem value="warning">Warning</SelectItem>
+                      <SelectItem value="critical">Critical</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              {projectHealthData.length === 0 ? (
+              {filteredHealthData.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                   <Buildings size={48} className="text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No active projects</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Project health metrics will appear here
+                  <h3 className="text-lg font-semibold mb-2">No projects match filters</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Try adjusting your filters or create a new project
                   </p>
+                  <Button variant="outline" onClick={() => { setStatusFilter('all'); setHealthFilter('all') }}>
+                    Clear Filters
+                  </Button>
                 </div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Project</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Schedule</TableHead>
-                      <TableHead>Budget</TableHead>
-                      <TableHead>Open RFIs</TableHead>
-                      <TableHead>Overdue Tasks</TableHead>
-                      <TableHead>Risks</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {projectHealthData.map((health) => {
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <span>Showing {filteredHealthData.length} of {projectHealthData.length} projects</span>
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Project</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Schedule</TableHead>
+                        <TableHead>Budget</TableHead>
+                        <TableHead>Open RFIs</TableHead>
+                        <TableHead>Overdue Tasks</TableHead>
+                        <TableHead>Risks</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredHealthData.map((health) => {
                       const statusBadge = getStatusBadge(health.status)
                       return (
                         <TableRow key={health.project.id}>
@@ -405,6 +449,7 @@ export function PortfolioPulsePage() {
                     })}
                   </TableBody>
                 </Table>
+                </div>
               )}
             </CardContent>
           </Card>

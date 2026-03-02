@@ -40,8 +40,8 @@ export function GradientSettingsCard() {
   const currentPreset = getPresetById(preferences.defaultPreset)
 
   const handleSelectPreset = (presetId: string) => {
-    setPreferences(prev => ({
-      ...prev,
+    setPreferences((currentPrefs) => ({
+      ...currentPrefs,
       defaultPreset: presetId
     }))
     toast.success('Gradient preset updated', {
@@ -50,54 +50,65 @@ export function GradientSettingsCard() {
   }
 
   const handleToggleAutoSuggest = (enabled: boolean) => {
-    setPreferences(prev => ({
-      ...prev,
+    setPreferences((currentPrefs) => ({
+      ...currentPrefs,
       autoSuggest: enabled
     }))
+    toast.success(enabled ? 'Auto-suggest enabled' : 'Auto-suggest disabled')
   }
 
   const handleToggleAnimations = (enabled: boolean) => {
-    setPreferences(prev => ({
-      ...prev,
+    setPreferences((currentPrefs) => ({
+      ...currentPrefs,
       animateTransitions: enabled
     }))
+    toast.success(enabled ? 'Animations enabled' : 'Animations disabled')
   }
 
   const handleAddCustomGradient = () => {
-    if (!customName || !customGradient) {
+    if (!customName.trim() || !customGradient.trim()) {
       toast.error('Please provide both name and gradient CSS')
       return
     }
 
     const newGradient = {
       id: `custom-${Date.now()}`,
-      name: customName,
-      gradient: customGradient,
-      accentColor: customAccent || undefined
+      name: customName.trim(),
+      gradient: customGradient.trim(),
+      accentColor: customAccent.trim() || undefined
     }
 
-    setPreferences(prev => ({
-      ...prev,
-      customGradients: [...prev.customGradients, newGradient]
-    }))
+    setPreferences((currentPrefs) => {
+      const updated = {
+        ...currentPrefs,
+        customGradients: [...currentPrefs.customGradients, newGradient]
+      }
+      return updated
+    })
 
     setCustomName('')
     setCustomGradient('')
     setCustomAccent('')
     
-    toast.success('Custom gradient added')
+    toast.success('Custom gradient added', {
+      description: `"${newGradient.name}" has been saved`
+    })
   }
 
   const handleDeleteCustomGradient = (id: string) => {
-    setPreferences(prev => ({
-      ...prev,
-      customGradients: prev.customGradients.filter(g => g.id !== id)
-    }))
+    setPreferences((currentPrefs) => {
+      const gradient = currentPrefs.customGradients.find(g => g.id === id)
+      return {
+        ...currentPrefs,
+        customGradients: currentPrefs.customGradients.filter(g => g.id !== id),
+        defaultPreset: currentPrefs.defaultPreset === id ? 'steel-forge' : currentPrefs.defaultPreset
+      }
+    })
     toast.success('Custom gradient removed')
   }
 
   const handleReset = () => {
-    setPreferences(DEFAULT_GRADIENT_PREFERENCES)
+    setPreferences(() => ({ ...DEFAULT_GRADIENT_PREFERENCES }))
     toast.success('Gradient preferences reset to defaults')
   }
 
