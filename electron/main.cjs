@@ -15,6 +15,16 @@ const {
   listCostCodes,
   updateCostCode,
   deleteCostCode,
+  createTask,
+  listTasks,
+  updateTask,
+  deleteTask,
+  createPMAInsight,
+  listPMAInsights,
+  updatePMAInsight,
+  resolvePMAInsight,
+  dismissPMAInsight,
+  generatePMAInsights,
   getDashboardCounts,
 } = require("./db/queries");
 
@@ -404,6 +414,86 @@ ipcMain.handle("db:deleteCostCode", async (event, id, userId) => {
 ipcMain.handle("db:getDashboardCounts", async (event, projectId) => {
   try {
     return await getDashboardCounts(projectId);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:createTask", async (event, data) => {
+  try {
+    return await createTask(data);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:listTasks", async (event, projectId, options) => {
+  try {
+    return await listTasks(projectId, options);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:updateTask", async (event, id, data) => {
+  try {
+    return await updateTask(id, data);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:deleteTask", async (event, id, userId) => {
+  try {
+    return await deleteTask(id, userId);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:createPMAInsight", async (event, data) => {
+  try {
+    return await createPMAInsight(data);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:listPMAInsights", async (event, projectId, options) => {
+  try {
+    return await listPMAInsights(projectId, options);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:updatePMAInsight", async (event, id, data) => {
+  try {
+    return await updatePMAInsight(id, data);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:resolvePMAInsight", async (event, id, userId) => {
+  try {
+    return await resolvePMAInsight(id, userId);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:dismissPMAInsight", async (event, id, userId, reason) => {
+  try {
+    return await dismissPMAInsight(id, userId, reason);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:generatePMAInsights", async (event, projectId) => {
+  try {
+    return await generatePMAInsights(projectId);
   } catch (error) {
     return { success: false, error: error.message };
   }

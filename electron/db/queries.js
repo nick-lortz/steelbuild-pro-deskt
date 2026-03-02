@@ -1,5 +1,5 @@
 const { eq, and, isNull, desc, sql } = require('drizzle-orm');
-const { getDatabase } = require('./init');
+const { getDatabase, getSQLiteDB } = require('./init');
 const { projects, rfis, equipment, cost_codes, audit_log } = require('../../packages/db/schema');
 const { v4: uuidv4 } = require('uuid');
 
@@ -280,6 +280,376 @@ async function deleteCostCode(id, userId = null) {
   return { success: true };
 }
 
+async function createTask(data) {
+  const sqliteDb = getSQLiteDB();
+  const id = uuidv4();
+  const now = new Date().toISOString();
+  
+  const task = {
+    id,
+    project_id: data.project_id,
+    name: data.name,
+    start_date: data.start_date || null,
+    end_date: data.end_date || null,
+    baseline_start_date: data.baseline_start_date || null,
+    baseline_end_date: data.baseline_end_date || null,
+    status: data.status || 'not-started',
+    percent_complete: data.percent_complete || 0,
+    created_at: now,
+    updated_at: now,
+    created_by: data.created_by || null,
+  };
+  
+  sqliteDb.prepare(`
+    INSERT INTO tasks (id, project_id, name, start_date, end_date, baseline_start_date, baseline_end_date, status, percent_complete, created_at, updated_at, created_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    task.id,
+    task.project_id,
+    task.name,
+    task.start_date,
+    task.end_date,
+    task.baseline_start_date,
+    task.baseline_end_date,
+    task.status,
+    task.percent_complete,
+    task.created_at,
+    task.updated_at,
+    task.created_by
+  );
+  
+  logAudit('task', id, 'create', data.project_id, task, data.created_by);
+  
+  return { success: true, data: task };
+}
+
+async function listTasks(projectId, options = {}) {
+  const sqliteDb = getSQLiteDB();
+  const { status, limit = 100, offset = 0 } = options;
+  
+  const query = `
+    SELECT * FROM tasks 
+    WHERE project_id = ? AND deleted_at IS NULL
+    ${status ? 'AND status = ?' : ''}
+    ORDER BY created_at DESC
+    LIMIT ? OFFSET ?
+  `;
+  
+  const params = status 
+    ? [projectId, status, limit, offset]
+    : [projectId, limit, offset];
+  
+  const results = sqliteDb.prepare(query).all(...params);
+  return { success: true, data: results };
+}
+
+async function updateTask(id, data) {
+  const sqliteDb = getSQLiteDB();
+  const now = new Date().toISOString();
+  
+  const existing = sqliteDb.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
+  if (!existing) {
+    return { success: false, error: 'Task not found' };
+  }
+  
+  const updateFields = [];
+  const values = [];
+  
+  if (data.name !== undefined) {
+    updateFields.push('name = ?');
+    values.push(data.name);
+  }
+  if (data.start_date !== undefined) {
+    updateFields.push('start_date = ?');
+    values.push(data.start_date);
+  }
+  if (data.end_date !== undefined) {
+    updateFields.push('end_date = ?');
+    values.push(data.end_date);
+  }
+  if (data.baseline_start_date !== undefined) {
+    updateFields.push('baseline_start_date = ?');
+    values.push(data.baseline_start_date);
+  }
+  if (data.baseline_end_date !== undefined) {
+    updateFields.push('baseline_end_date = ?');
+    values.push(data.baseline_end_date);
+  }
+  if (data.status !== undefined) {
+    updateFields.push('status = ?');
+    values.push(data.status);
+  }
+  if (data.percent_complete !== undefined) {
+    updateFields.push('percent_complete = ?');
+    values.push(data.percent_complete);
+  }
+  
+  updateFields.push('updated_at = ?');
+  values.push(now);
+  
+  if (data.updated_by !== undefined) {
+    updateFields.push('updated_by = ?');
+    values.push(data.updated_by);
+  }
+  
+  values.push(id);
+  
+  sqliteDb.prepare(`UPDATE tasks SET ${updateFields.join(', ')} WHERE id = ?`).run(...values);
+  logAudit('task', id, 'update', existing.project_id, data, data.updated_by);
+  
+  return { success: true };
+}
+
+async function deleteTask(id, userId = null) {
+  const sqliteDb = getSQLiteDB();
+  const now = new Date().toISOString();
+  
+  const existing = sqliteDb.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
+  if (!existing) {
+    return { success: false, error: 'Task not found' };
+  }
+  
+  sqliteDb.prepare('UPDATE tasks SET deleted_at = ? WHERE id = ?').run(now, id);
+  logAudit('task', id, 'delete', existing.project_id, null, userId);
+  
+  return { success: true };
+}
+
+async function createPMAInsight(data) {
+  const sqliteDb = getSQLiteDB();
+  const id = uuidv4();
+  const now = new Date().toISOString();
+  
+  const insight = {
+    id,
+    project_id: data.project_id,
+    severity: data.severity,
+    type: data.type,
+    title: data.title,
+    details: data.details,
+    entity_refs_json: data.entity_refs ? JSON.stringify(data.entity_refs) : null,
+    status: 'open',
+    created_at: now,
+    updated_at: now,
+  };
+  
+  sqliteDb.prepare(`
+    INSERT INTO pma_insights (id, project_id, severity, type, title, details, entity_refs_json, status, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    insight.id,
+    insight.project_id,
+    insight.severity,
+    insight.type,
+    insight.title,
+    insight.details,
+    insight.entity_refs_json,
+    insight.status,
+    insight.created_at,
+    insight.updated_at
+  );
+  
+  logAudit('pma_insight', id, 'create', data.project_id, insight);
+  
+  return { success: true, data: { ...insight, entity_refs: data.entity_refs || [] } };
+}
+
+async function listPMAInsights(projectId, options = {}) {
+  const sqliteDb = getSQLiteDB();
+  const { status, limit = 100, offset = 0 } = options;
+  
+  const query = `
+    SELECT * FROM pma_insights 
+    WHERE project_id = ?
+    ${status ? 'AND status = ?' : ''}
+    ORDER BY created_at DESC
+    LIMIT ? OFFSET ?
+  `;
+  
+  const params = status 
+    ? [projectId, status, limit, offset]
+    : [projectId, limit, offset];
+  
+  const results = sqliteDb.prepare(query).all(...params);
+  
+  return { 
+    success: true, 
+    data: results.map(r => ({
+      ...r,
+      entity_refs: r.entity_refs_json ? JSON.parse(r.entity_refs_json) : []
+    }))
+  };
+}
+
+async function updatePMAInsight(id, data) {
+  const sqliteDb = getSQLiteDB();
+  const now = new Date().toISOString();
+  
+  const existing = sqliteDb.prepare('SELECT * FROM pma_insights WHERE id = ?').get(id);
+  if (!existing) {
+    return { success: false, error: 'Insight not found' };
+  }
+  
+  const updateFields = [];
+  const values = [];
+  
+  Object.entries(data).forEach(([key, value]) => {
+    if (key !== 'id' && value !== undefined) {
+      updateFields.push(`${key} = ?`);
+      values.push(value);
+    }
+  });
+  
+  updateFields.push('updated_at = ?');
+  values.push(now);
+  values.push(id);
+  
+  sqliteDb.prepare(`UPDATE pma_insights SET ${updateFields.join(', ')} WHERE id = ?`).run(...values);
+  logAudit('pma_insight', id, 'update', existing.project_id, data);
+  
+  return { success: true };
+}
+
+async function resolvePMAInsight(id, userId) {
+  const sqliteDb = getSQLiteDB();
+  const now = new Date().toISOString();
+  
+  const existing = sqliteDb.prepare('SELECT * FROM pma_insights WHERE id = ?').get(id);
+  if (!existing) {
+    return { success: false, error: 'Insight not found' };
+  }
+  
+  sqliteDb.prepare(`
+    UPDATE pma_insights 
+    SET status = 'resolved', resolved_at = ?, resolved_by = ?, updated_at = ?
+    WHERE id = ?
+  `).run(now, userId, now, id);
+  
+  logAudit('pma_insight', id, 'resolve', existing.project_id, { userId });
+  
+  return { success: true };
+}
+
+async function dismissPMAInsight(id, userId, reason) {
+  const sqliteDb = getSQLiteDB();
+  const now = new Date().toISOString();
+  
+  const existing = sqliteDb.prepare('SELECT * FROM pma_insights WHERE id = ?').get(id);
+  if (!existing) {
+    return { success: false, error: 'Insight not found' };
+  }
+  
+  sqliteDb.prepare(`
+    UPDATE pma_insights 
+    SET status = 'dismissed', dismissed_at = ?, dismissed_by = ?, dismiss_reason = ?, updated_at = ?
+    WHERE id = ?
+  `).run(now, userId, reason, now, id);
+  
+  logAudit('pma_insight', id, 'dismiss', existing.project_id, { userId, reason });
+  
+  return { success: true };
+}
+
+async function generatePMAInsights(projectId) {
+  const sqliteDb = getSQLiteDB();
+  const insights = [];
+  const now = new Date();
+  
+  const agingRFIs = sqliteDb.prepare(`
+    SELECT * FROM rfis 
+    WHERE project_id = ? 
+      AND status != 'closed' 
+      AND deleted_at IS NULL
+      AND julianday('now') - julianday(created_at) > 3
+  `).all(projectId);
+  
+  for (const rfi of agingRFIs) {
+    const ageInDays = Math.floor((now - new Date(rfi.created_at)) / (1000 * 60 * 60 * 24));
+    const severity = ageInDays > 7 ? 'high' : 'medium';
+    
+    const insight = {
+      project_id: projectId,
+      severity,
+      type: 'aging-rfi',
+      title: `RFI #${rfi.rfi_number} is ${ageInDays} days old`,
+      details: `RFI "${rfi.subject}" has been open for ${ageInDays} days without closure.`,
+      entity_refs: [
+        {
+          entity_type: 'rfi',
+          entity_id: rfi.id,
+          label: `RFI #${rfi.rfi_number}`,
+          link: `/projects/${projectId}/rfis?rfi=${rfi.id}`
+        }
+      ]
+    };
+    
+    const existing = sqliteDb.prepare(`
+      SELECT id FROM pma_insights 
+      WHERE project_id = ? 
+        AND type = 'aging-rfi' 
+        AND entity_refs_json LIKE ?
+        AND status = 'open'
+    `).get(projectId, `%"entity_id":"${rfi.id}"%`);
+    
+    if (!existing) {
+      const result = await createPMAInsight(insight);
+      if (result.success) {
+        insights.push(result.data);
+      }
+    }
+  }
+  
+  const slippingTasks = sqliteDb.prepare(`
+    SELECT * FROM tasks 
+    WHERE project_id = ? 
+      AND status != 'completed'
+      AND baseline_end_date IS NOT NULL
+      AND end_date IS NOT NULL
+      AND deleted_at IS NULL
+      AND julianday(end_date) > julianday(baseline_end_date)
+  `).all(projectId);
+  
+  for (const task of slippingTasks) {
+    const baselineEnd = new Date(task.baseline_end_date);
+    const currentEnd = new Date(task.end_date);
+    const deltaDays = Math.floor((currentEnd - baselineEnd) / (1000 * 60 * 60 * 24));
+    const severity = deltaDays > 7 ? 'high' : 'medium';
+    
+    const insight = {
+      project_id: projectId,
+      severity,
+      type: 'schedule-slippage',
+      title: `Task "${task.name}" is ${deltaDays} days behind baseline`,
+      details: `Task end date (${task.end_date}) is ${deltaDays} days later than baseline (${task.baseline_end_date}).`,
+      entity_refs: [
+        {
+          entity_type: 'task',
+          entity_id: task.id,
+          label: task.name,
+          link: `/projects/${projectId}/schedule?task=${task.id}`
+        }
+      ]
+    };
+    
+    const existing = sqliteDb.prepare(`
+      SELECT id FROM pma_insights 
+      WHERE project_id = ? 
+        AND type = 'schedule-slippage' 
+        AND entity_refs_json LIKE ?
+        AND status = 'open'
+    `).get(projectId, `%"entity_id":"${task.id}"%`);
+    
+    if (!existing) {
+      const result = await createPMAInsight(insight);
+      if (result.success) {
+        insights.push(result.data);
+      }
+    }
+  }
+  
+  return { success: true, data: insights };
+}
+
 async function getDashboardCounts(projectId) {
   const db = getDatabase();
   
@@ -347,5 +717,15 @@ module.exports = {
   listCostCodes,
   updateCostCode,
   deleteCostCode,
+  createTask,
+  listTasks,
+  updateTask,
+  deleteTask,
+  createPMAInsight,
+  listPMAInsights,
+  updatePMAInsight,
+  resolvePMAInsight,
+  dismissPMAInsight,
+  generatePMAInsights,
   getDashboardCounts,
 };

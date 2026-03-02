@@ -37,6 +37,7 @@ import { ProjectContactsPage } from '@/pages/contacts/project-contacts-page'
 import { JobSetupPage } from '@/pages/job-setup/job-setup-page'
 import { SettingsPage } from '@/pages/global/settings-page'
 import { PMAPage } from '@/pages/projects/pma-page'
+import { PMADailyBriefPage } from '@/pages/projects/pma-daily-brief-page'
 
 export const router = createBrowserRouter([
   {
@@ -189,7 +190,7 @@ export const router = createBrowserRouter([
           },
           {
             path: 'pma',
-            element: <PMAPage />,
+            element: <PMADailyBriefPage />,
           },
         ],
       },

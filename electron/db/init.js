@@ -104,6 +104,43 @@ function createTablesIfNotExists() {
       UNIQUE(project_id, code)
     );
 
+    CREATE TABLE IF NOT EXISTS tasks (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      start_date TEXT,
+      end_date TEXT,
+      baseline_start_date TEXT,
+      baseline_end_date TEXT,
+      status TEXT NOT NULL DEFAULT 'not-started',
+      percent_complete REAL NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      created_by TEXT,
+      updated_by TEXT,
+      deleted_at TEXT,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS pma_insights (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      severity TEXT NOT NULL,
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      details TEXT NOT NULL,
+      entity_refs_json TEXT,
+      status TEXT NOT NULL DEFAULT 'open',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      resolved_at TEXT,
+      resolved_by TEXT,
+      dismissed_at TEXT,
+      dismissed_by TEXT,
+      dismiss_reason TEXT,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    );
+
     CREATE TABLE IF NOT EXISTS audit_log (
       id TEXT PRIMARY KEY,
       project_id TEXT,
@@ -119,6 +156,9 @@ function createTablesIfNotExists() {
     CREATE INDEX IF NOT EXISTS idx_rfis_project_id ON rfis(project_id);
     CREATE INDEX IF NOT EXISTS idx_equipment_project_id ON equipment(project_id);
     CREATE INDEX IF NOT EXISTS idx_cost_codes_project_id ON cost_codes(project_id);
+    CREATE INDEX IF NOT EXISTS idx_tasks_project_id ON tasks(project_id);
+    CREATE INDEX IF NOT EXISTS idx_pma_insights_project_id ON pma_insights(project_id);
+    CREATE INDEX IF NOT EXISTS idx_pma_insights_status ON pma_insights(status);
     CREATE INDEX IF NOT EXISTS idx_audit_log_entity ON audit_log(entity_type, entity_id);
   `);
 }
@@ -128,6 +168,13 @@ function getDatabase() {
     throw new Error('Database not initialized. Call initDatabase first.');
   }
   return db;
+}
+
+function getSQLiteDB() {
+  if (!sqliteDb) {
+    throw new Error('Database not initialized. Call initDatabase first.');
+  }
+  return sqliteDb;
 }
 
 function closeDatabase() {
@@ -141,5 +188,6 @@ function closeDatabase() {
 module.exports = {
   initDatabase,
   getDatabase,
+  getSQLiteDB,
   closeDatabase,
 };
