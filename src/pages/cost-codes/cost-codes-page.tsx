@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
 import { costCodesDb } from '@/lib/db'
 import type { CostCode } from '@/lib/types'
+import { triggerFinancialRollup } from '@/lib/services/financial-rollup'
 
 export function CostCodesPage() {
   const { projectId } = useParams()
@@ -66,10 +67,15 @@ export function CostCodesPage() {
       })
 
       await loadCostCodes()
+      
+      if (projectId) {
+        await triggerFinancialRollup(projectId)
+      }
+      
       window.dispatchEvent(new CustomEvent('dataUpdated', { detail: { type: 'costCode', action: 'create' } }))
       setIsCreateOpen(false)
       setFormData({ code: '', name: '', category: 'labor', budget_amount: '' })
-      toast.success('Cost code created')
+      toast.success('Cost code created and financials updated')
     } catch (error: any) {
       console.error('Failed to create cost code:', error)
       toast.error(error.message || 'Failed to create cost code')
@@ -102,11 +108,16 @@ export function CostCodesPage() {
       })
 
       await loadCostCodes()
+      
+      if (projectId) {
+        await triggerFinancialRollup(projectId)
+      }
+      
       window.dispatchEvent(new CustomEvent('dataUpdated', { detail: { type: 'costCode', action: 'update' } }))
       setIsEditOpen(false)
       setEditingCode(null)
       setFormData({ code: '', name: '', category: 'labor', budget_amount: '' })
-      toast.success('Cost code updated')
+      toast.success('Cost code updated and financials recalculated')
     } catch (error: any) {
       console.error('Failed to update cost code:', error)
       toast.error(error.message || 'Failed to update cost code')
@@ -117,6 +128,11 @@ export function CostCodesPage() {
     try {
       await costCodesDb.delete(codeId)
       await loadCostCodes()
+      
+      if (projectId) {
+        await triggerFinancialRollup(projectId)
+      }
+      
       window.dispatchEvent(new CustomEvent('dataUpdated', { detail: { type: 'costCode', action: 'delete' } }))
       toast.success('Cost code deleted')
     } catch (error: any) {

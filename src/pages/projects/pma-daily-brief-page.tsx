@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Sparkle,
@@ -30,34 +30,41 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Progress } from '@/components/ui/progress'
 import { toast } from 'sonner'
-import { usePMAInsights } from '@/hooks/use-database'
-import type { PMAInsight } from '@/types/electron'
+import { generateProjectInsights, generateDailyBrief, type PMAInsight } from '@/lib/services/pma-heuristics'
+import { useKV } from '@github/spark/hooks'
 
 export function PMADailyBriefPage() {
   const { projectId } = useParams()
   const navigate = useNavigate()
-  const { insights, loading, generateInsights, resolveInsight, dismissInsight } = usePMAInsights(projectId)
-  
+  const [insights, setInsights] = useKV<PMAInsight[]>(`pma-insights-${projectId}`, [])
+  const [loading, setLoading] = useState(false)
   const [scanning, setScanning] = useState(false)
   const [isDismissOpen, setIsDismissOpen] = useState(false)
   const [selectedInsight, setSelectedInsight] = useState<PMAInsight | null>(null)
   const [dismissReason, setDismissReason] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<'all' | 'rfi-aging' | 'schedule-slip' | 'budget-overrun'>('all')
 
+  useEffect(() => {
+    if (projectId && insights.length === 0) {
+      handleRunScan()
+    }
+  }, [projectId])
+
   const handleRunScan = async () => {
     if (!projectId) return
     
     setScanning(true)
     try {
-      const result = await generateInsights()
-      if (result.success && result.data) {
-        if (result.data.length > 0) {
-          toast.success(`Generated ${result.data.length} new insight${result.data.length !== 1 ? 's' : ''}`)
-        } else {
-          toast.info('No new insights detected')
-        }
+      const newInsights = await generateProjectInsights(projectId)
+      
+      const existingIds = new Set(insights.filter(i => i.status === 'open').map(i => `${i.entityType}-${i.entityId}`))
+      const uniqueNew = newInsights.filter(i => !existingIds.has(`${i.entityType}-${i.entityId}`))
+      
+      if (uniqueNew.length > 0) {
+        setInsights((current) => [...current, ...uniqueNew])
+        toast.success(`Generated ${uniqueNew.length} new insight${uniqueNew.length !== 1 ? 's' : ''}`)
       } else {
-        toast.error('Failed to generate insights')
+        toast.info('No new insights detected')
       }
     } catch (error) {
       console.error('Failed to run scan:', error)
@@ -71,12 +78,14 @@ export function PMADailyBriefPage() {
     if (!projectId) return
     
     try {
-      const result = await resolveInsight(insightId, 'Current User')
-      if (result.success) {
-        toast.success('Insight marked as resolved')
-      } else {
-        toast.error('Failed to resolve insight')
-      }
+      setInsights((current) =>
+        current.map(i =>
+          i.id === insightId
+            ? { ...i, status: 'resolved' as const, resolvedAt: new Date().toISOString(), resolvedBy: 'Current User' }
+            : i
+        )
+      )
+      toast.success('Insight marked as resolved')
     } catch (error) {
       console.error('Failed to resolve insight:', error)
       toast.error('Failed to resolve insight')
@@ -92,15 +101,23 @@ export function PMADailyBriefPage() {
     }
     
     try {
-      const result = await dismissInsight(selectedInsight.id, 'Current User', dismissReason)
-      if (result.success) {
-        toast.success('Insight dismissed')
-        setIsDismissOpen(false)
-        setSelectedInsight(null)
-        setDismissReason('')
-      } else {
-        toast.error('Failed to dismiss insight')
-      }
+      setInsights((current) =>
+        current.map(i =>
+          i.id === selectedInsight.id
+            ? { 
+                ...i, 
+                status: 'dismissed' as const, 
+                dismissedAt: new Date().toISOString(), 
+                dismissedBy: 'Current User',
+                dismissReason 
+              }
+            : i
+        )
+      )
+      toast.success('Insight dismissed')
+      setIsDismissOpen(false)
+      setSelectedInsight(null)
+      setDismissReason('')
     } catch (error) {
       console.error('Failed to dismiss insight:', error)
       toast.error('Failed to dismiss insight')
@@ -167,10 +184,7 @@ export function PMADailyBriefPage() {
     return activeInsights
   }, [selectedCategory, activeInsights, insightsByCategory])
   
-  const criticalCount = activeInsights.filter(i => i.severity === 'critical').length
-  const highCount = activeInsights.filter(i => i.severity === 'high').length
-  const mediumCount = activeInsights.filter(i => i.severity === 'medium').length
-  const lowCount = activeInsights.filter(i => i.severity === 'low').length
+  const brief = useMemo(() => generateDailyBrief(activeInsights), [activeInsights])
 
   const getAgingDays = (createdAt: string) => {
     const created = new Date(createdAt)

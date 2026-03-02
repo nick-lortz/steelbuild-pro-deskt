@@ -9,20 +9,34 @@ import {
   X,
   FilePdf,
   Eye,
+  Lock,
+  Warning,
 } from '@phosphor-icons/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { useKV } from '@github/spark/hooks'
 import { toast } from 'sonner'
+import { 
+  canTransitionToStatus, 
+  canEdit, 
+  canDelete, 
+  validateStatusTransition,
+  isDrawingLocked,
+  getStatusProgress,
+  STATUS_LABELS,
+  type DrawingStatus
+} from '@/lib/services/drawing-workflow'
 
-type DrawingSetStatus = 'IFA' | 'BFA' | 'OFS' | 'BFS' | 'FFF'
+type DrawingSetStatus = DrawingStatus
 
 interface DrawingSet {
   id: string
@@ -316,25 +330,49 @@ export function DrawingsDBPage() {
     }
   }
 
-  const handleStatusChange = (setId: string, currentStatus: DrawingSetStatus) => {
-    const currentIndex = STATUS_SEQUENCE.indexOf(currentStatus)
-    if (currentIndex === -1 || currentIndex === STATUS_SEQUENCE.length - 1) {
-      toast.error('Cannot transition status')
+  const handleStatusChange = (setId: string, currentStatus: DrawingSetStatus, targetStatus: DrawingSetStatus) => {
+    const validation = validateStatusTransition(currentStatus, targetStatus, 'user')
+    
+    if (!validation.isValid) {
+      toast.error(validation.error || 'Invalid status transition')
       return
     }
-
-    const nextStatus = STATUS_SEQUENCE[currentIndex + 1]
+    
+    const transition = canTransitionToStatus(currentStatus, targetStatus)
+    
+    if (!transition.canTransition) {
+      toast.error(transition.reason || 'Cannot transition to this status')
+      return
+    }
+    
+    if (validation.warning) {
+      if (!confirm(`${validation.warning}\n\nDo you want to continue?`)) {
+        return
+      }
+    }
     
     setDrawingSets((current) =>
       current.map(set =>
-        set.id === setId ? { ...set, status: nextStatus } : set
+        set.id === setId ? { ...set, status: targetStatus } : set
       )
     )
     
-    toast.success(`Status updated to ${STATUS_LABELS[nextStatus]}`)
+    if (targetStatus === 'FFF') {
+      toast.success(`Drawing set locked at ${STATUS_LABELS[targetStatus]} - Edit/Delete now restricted`)
+    } else {
+      toast.success(`Status updated to ${STATUS_LABELS[targetStatus]}`)
+    }
   }
 
   const handleDeleteSet = (setId: string) => {
+    const set = drawingSets.find(s => s.id === setId)
+    if (!set) return
+    
+    if (isDrawingLocked(set.status) && !canDelete(set.status, 'user')) {
+      toast.error('Cannot delete FFF (Final for Fabrication) drawing. Only Project Managers can delete locked drawings.')
+      return
+    }
+    
     if (!confirm('Are you sure you want to delete this drawing set?')) {
       return
     }
@@ -523,13 +561,22 @@ export function DrawingsDBPage() {
                   </TableHeader>
                   <TableBody>
                     {drawingSets.map((set) => {
-                      const currentIndex = STATUS_SEQUENCE.indexOf(set.status)
-                      const canAdvance = currentIndex !== -1 && currentIndex < STATUS_SEQUENCE.length - 1
+                      const nextStatuses = canTransitionToStatus(set.status, set.status).nextAvailableStatuses
+                      const isLocked = isDrawingLocked(set.status)
+                      const canEditSet = canEdit(set.status, 'user')
+                      const canDeleteSet = canDelete(set.status, 'user')
 
                       return (
                         <TableRow key={set.id}>
                           <TableCell className="font-mono">{set.set_number || '-'}</TableCell>
-                          <TableCell className="font-medium">{set.name}</TableCell>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              {set.name}
+                              {isLocked && (
+                                <Lock size={14} className="text-yellow-600" title="Locked for fabrication" />
+                              )}
+                            </div>
+                          </TableCell>
                           <TableCell>{set.discipline || '-'}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
@@ -546,13 +593,13 @@ export function DrawingsDBPage() {
                           </TableCell>
                           <TableCell>
                             <div className="flex gap-2">
-                              {canAdvance && (
+                              {nextStatuses.length > 0 && (
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => handleStatusChange(set.id, set.status)}
+                                  onClick={() => handleStatusChange(set.id, set.status, nextStatuses[0])}
                                 >
-                                  → {STATUS_SEQUENCE[currentIndex + 1]}
+                                  → {nextStatuses[0]}
                                 </Button>
                               )}
                               <Button
@@ -562,6 +609,7 @@ export function DrawingsDBPage() {
                                   setSelectedSet(set)
                                   setIsAddSheetOpen(true)
                                 }}
+                                disabled={!canEditSet}
                               >
                                 <Upload size={14} className="mr-1" />
                                 Add Sheet
@@ -573,6 +621,7 @@ export function DrawingsDBPage() {
                                   setSelectedSet(set)
                                   setIsBulkUploadOpen(true)
                                 }}
+                                disabled={!canEditSet}
                               >
                                 <Stack size={14} className="mr-1" />
                                 Bulk Upload
@@ -581,6 +630,7 @@ export function DrawingsDBPage() {
                                 size="sm"
                                 variant="ghost"
                                 onClick={() => handleDeleteSet(set.id)}
+                                disabled={!canDeleteSet}
                               >
                                 <X size={14} />
                               </Button>

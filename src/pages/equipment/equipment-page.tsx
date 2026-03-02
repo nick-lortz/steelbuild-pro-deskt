@@ -51,10 +51,28 @@ function EquipmentPageContent() {
     setLoading(true)
     try {
       const allEquipment = await equipmentDb.getAll()
-      setEquipment(allEquipment)
+      
+      if (!Array.isArray(allEquipment)) {
+        console.warn('Equipment data is not an array, resetting to empty array')
+        setEquipment([])
+        return
+      }
+      
+      const validEquipment = allEquipment.filter(item => {
+        if (!item || typeof item !== 'object') return false
+        if (!item.id || !item.name) return false
+        return true
+      })
+      
+      if (validEquipment.length < allEquipment.length) {
+        console.warn(`Filtered out ${allEquipment.length - validEquipment.length} invalid equipment records`)
+      }
+      
+      setEquipment(validEquipment)
     } catch (error) {
       console.error('Failed to load equipment:', error)
       toast.error('Failed to load equipment')
+      setEquipment([])
     } finally {
       setLoading(false)
     }
