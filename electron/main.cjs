@@ -1,8 +1,9 @@
-const { app, BrowserWindow, Menu, dialog, ipcMain } = require("electron");
+const { app, BrowserWindow, Menu, dialog, ipcMain, shell } = require("electron");
 const path = require("path");
 const fs = require("fs");
 
 const isDev = !app.isPackaged;
+const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL || "http://localhost:5173";
 
 let mainWindow = null;
 
@@ -18,16 +19,24 @@ function createWindow() {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      enableRemoteModule: false,
+      sandbox: true,
     },
   });
 
   if (isDev) {
-    mainWindow.loadURL("http://localhost:5173");
+    mainWindow.loadURL(DEV_SERVER_URL);
     mainWindow.webContents.openDevTools();
   } else {
     mainWindow.loadFile(path.join(__dirname, "..", "dist", "index.html"));
   }
+
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      shell.openExternal(url);
+    }
+    return { action: 'deny' };
+  });
 
   mainWindow.on("closed", () => {
     mainWindow = null;
@@ -191,7 +200,15 @@ Export Daily Report: Ctrl/Cmd + E
   Menu.setApplicationMenu(menu);
 }
 
-app.on("ready", createWindow);
+app.whenReady().then(() => {
+  createWindow();
+
+  app.on("activate", () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+    }
+  });
+});
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
@@ -199,28 +216,42 @@ app.on("window-all-closed", () => {
   }
 });
 
-app.on("activate", () => {
-  if (mainWindow === null) {
-    createWindow();
-  }
+ipcMain.handle("app:getVersion", () => {
+  return app.getVersion();
 });
 
-ipcMain.handle("get-user-data-path", () => {
+ipcMain.handle("app:getPlatform", () => {
+  return process.platform;
+});
+
+ipcMain.handle("shell:openExternal", async (event, url) => {
+  if (typeof url !== 'string' || (!url.startsWith('http://') && !url.startsWith('https://'))) {
+    throw new Error('Invalid URL');
+  }
+  await shell.openExternal(url);
+  return { success: true };
+});
+
+ipcMain.handle("app:getUserDataPath", () => {
   return app.getPath("userData");
 });
 
-ipcMain.handle("save-file-dialog", async (event, options) => {
+ipcMain.handle("dialog:saveFile", async (event, options) => {
   const result = await dialog.showSaveDialog(mainWindow, options);
   return result;
 });
 
-ipcMain.handle("open-file-dialog", async (event, options) => {
+ipcMain.handle("dialog:openFile", async (event, options) => {
   const result = await dialog.showOpenDialog(mainWindow, options);
   return result;
 });
 
-ipcMain.handle("write-file", async (event, filePath, data) => {
+ipcMain.handle("fs:writeFile", async (event, filePath, data) => {
   try {
+    const userDataPath = app.getPath("userData");
+    if (!filePath.startsWith(userDataPath)) {
+      throw new Error("File access denied: Path must be within user data directory");
+    }
     fs.writeFileSync(filePath, data);
     return { success: true };
   } catch (error) {
@@ -228,11 +259,23 @@ ipcMain.handle("write-file", async (event, filePath, data) => {
   }
 });
 
-ipcMain.handle("read-file", async (event, filePath) => {
+ipcMain.handle("fs:readFile", async (event, filePath) => {
   try {
+    const userDataPath = app.getPath("userData");
+    if (!filePath.startsWith(userDataPath)) {
+      throw new Error("File access denied: Path must be within user data directory");
+    }
     const data = fs.readFileSync(filePath, "utf-8");
     return { success: true, data };
   } catch (error) {
     return { success: false, error: error.message };
   }
+});
+
+ipcMain.handle("db:query", async (event, query, params) => {
+  return { success: true, data: [], message: "Database stub - implement in Sprint 2" };
+});
+
+ipcMain.handle("db:execute", async (event, query, params) => {
+  return { success: true, affectedRows: 0, message: "Database stub - implement in Sprint 2" };
 });

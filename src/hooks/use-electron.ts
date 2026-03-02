@@ -17,7 +17,7 @@ export function useElectronMenuHandlers() {
   useEffect(() => {
     if (!isElectron || !api) return;
 
-    const unsubNavigate = api.onMenuNavigate((path: string) => {
+    const unsubNavigate = api.menu.onNavigate((path: string) => {
       navigate(path);
     });
 
@@ -42,13 +42,13 @@ export function useElectronFileOperations() {
       return;
     }
 
-    const result = await api.saveFileDialog({
+    const result = await api.dialog.saveFile({
       defaultPath,
       filters: filters || [{ name: 'All Files', extensions: ['*'] }],
     });
 
     if (!result.canceled && result.filePath) {
-      await api.writeFile(result.filePath, data);
+      await api.fs.writeFile(result.filePath, data);
     }
   };
 
@@ -73,13 +73,13 @@ export function useElectronFileOperations() {
       });
     }
 
-    const result = await api.openFileDialog({
+    const result = await api.dialog.openFile({
       filters: filters || [{ name: 'All Files', extensions: ['*'] }],
       properties: ['openFile'],
     });
 
     if (!result.canceled && result.filePaths.length > 0) {
-      const fileResult = await api.readFile(result.filePaths[0]);
+      const fileResult = await api.fs.readFile(result.filePaths[0]);
       if (fileResult.success) {
         return fileResult.data || null;
       }
