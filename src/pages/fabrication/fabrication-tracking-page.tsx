@@ -1,20 +1,21 @@
 import { useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useKV } from '@github/spark/hooks'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Progress } from '@/components/ui/progress'
-import { Plus, Package, CheckCircle, Hammer } from '@phosphor-icons/react'
+import { Plus, Package, CheckCircle, Hammer, ArrowRight, Wrench } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import type { Fabrication } from '@/lib/types'
 
 export function FabricationTrackingPage() {
   const { projectId } = useParams<{ projectId: string }>()
+  const navigate = useNavigate()
   const [fabrications, setFabrications] = useKV<Fabrication[]>('fabrications', [])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [statusFilter, setStatusFilter] = useState<string>('all')
@@ -85,7 +86,17 @@ export function FabricationTrackingPage() {
           <h1 className="text-3xl font-bold">Fabrication Tracking</h1>
           <p className="text-muted-foreground">Monitor fabrication progress and status</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => navigate(`/projects/${projectId}/fab-tracking`)}
+            className="gap-2"
+          >
+            <Wrench size={16} />
+            Advanced Fab Tracking
+            <ArrowRight size={16} />
+          </Button>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2" />
@@ -138,7 +149,26 @@ export function FabricationTrackingPage() {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
+
+      <Card className="border-accent/50 bg-gradient-to-br from-accent/5 to-accent/10">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Wrench size={20} />
+            New: Comprehensive Fab Tracking
+          </CardTitle>
+          <CardDescription>
+            Track detailing dependencies, work packages, deliveries, QC checks, and blockers with our advanced fabrication management system
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button onClick={() => navigate(`/projects/${projectId}/fab-tracking`)} className="gap-2">
+            Open Advanced Fab Tracking
+            <ArrowRight size={16} />
+          </Button>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>

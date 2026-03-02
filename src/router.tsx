@@ -34,6 +34,7 @@ import { AlertsPage } from '@/pages/alerts/alerts-page'
 import { TodoListPage } from '@/pages/todo/todo-list-page'
 import { ProductionNotesPage } from '@/pages/production-notes/production-notes-page'
 import { FabricationTrackingPage } from '@/pages/fabrication/fabrication-tracking-page'
+import { FabTrackingComprehensivePage } from '@/pages/fabrication/fab-tracking-comprehensive-page'
 import { LookAheadPlanningPage } from '@/pages/lookahead/lookahead-planning-page'
 import { ProjectContactsPage } from '@/pages/contacts/project-contacts-page'
 import { JobSetupPage } from '@/pages/job-setup/job-setup-page'
@@ -185,6 +186,10 @@ export const router = createBrowserRouter([
           {
             path: 'fabrication',
             element: <FabricationTrackingPage />,
+          },
+          {
+            path: 'fab-tracking',
+            element: <FabTrackingComprehensivePage />,
           },
           {
             path: 'lookahead',
