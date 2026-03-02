@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CheckCircle, XCircle, Clock, Play, Database, Package, FileText, DollarSign } from '@phosphor-icons/react'
+import { CheckCircle, XCircle, Clock, Play, Database, Package, FileText, DollarSign, Blueprint, ChatCircle } from '@phosphor-icons/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -7,7 +7,8 @@ import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { toast } from 'sonner'
 import { useDatabase } from '@/hooks/use-database'
-import type { Equipment, CostCode, Contract } from '@/types/electron'
+import { useDrawingSets, useDrawingSheets } from '@/hooks/use-drawings'
+import type { Equipment, CostCode, Contract, RFI, DrawingSet, DrawingSheet } from '@/types/electron'
 
 interface TestResult {
   name: string
@@ -26,6 +27,39 @@ interface TestSuite {
 export function ElectronTestSuitePage() {
   const { db, isDesktop } = useDatabase()
   const [testSuites, setTestSuites] = useState<TestSuite[]>([
+    {
+      name: 'RFI Persistence',
+      icon: <ChatCircle className="h-5 w-5" />,
+      tests: [
+        { name: 'Create RFI', status: 'pending' },
+        { name: 'Read RFI', status: 'pending' },
+        { name: 'Update RFI', status: 'pending' },
+        { name: 'Delete RFI', status: 'pending' },
+        { name: 'RFI Auto-Numbering', status: 'pending' },
+      ],
+    },
+    {
+      name: 'Drawing Sets Persistence',
+      icon: <Blueprint className="h-5 w-5" />,
+      tests: [
+        { name: 'Create Drawing Set', status: 'pending' },
+        { name: 'Read Drawing Set', status: 'pending' },
+        { name: 'Update Drawing Set Status', status: 'pending' },
+        { name: 'Delete Drawing Set', status: 'pending' },
+        { name: 'Drawing Set Status Workflow', status: 'pending' },
+      ],
+    },
+    {
+      name: 'Drawing Sheets Persistence',
+      icon: <Blueprint className="h-5 w-5" />,
+      tests: [
+        { name: 'Create Drawing Sheet', status: 'pending' },
+        { name: 'Read Drawing Sheets', status: 'pending' },
+        { name: 'Update Sheet Status', status: 'pending' },
+        { name: 'Delete Drawing Sheet', status: 'pending' },
+        { name: 'Sheet Status Gates', status: 'pending' },
+      ],
+    },
     {
       name: 'Equipment Persistence',
       icon: <Package className="h-5 w-5" />,
@@ -75,8 +109,609 @@ export function ElectronTestSuitePage() {
     })
   }
 
-  const runEquipmentTests = async (projectId: string) => {
+  const runRFITests = async (projectId: string) => {
     const suiteIndex = 0
+    let createdRFIId = ''
+
+    updateTestStatus(suiteIndex, 0, { status: 'running' })
+    const startTime = Date.now()
+    
+    try {
+      const createResult = await db.createRFI({
+        project_id: projectId,
+        subject: 'Test RFI - Foundation Details',
+        question: 'Please clarify the foundation anchoring requirements for column A1?',
+        status: 'open',
+        priority: 'high',
+      })
+
+      if (createResult.success && createResult.data) {
+        createdRFIId = createResult.data.id
+        updateTestStatus(suiteIndex, 0, {
+          status: 'pass',
+          message: 'RFI created successfully',
+          details: `ID: ${createdRFIId}`,
+          duration: Date.now() - startTime,
+        })
+      } else {
+        throw new Error(createResult.error || 'Failed to create RFI')
+      }
+    } catch (error) {
+      updateTestStatus(suiteIndex, 0, {
+        status: 'fail',
+        message: 'Failed to create RFI',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        duration: Date.now() - startTime,
+      })
+      return
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 300))
+
+    updateTestStatus(suiteIndex, 1, { status: 'running' })
+    const readStartTime = Date.now()
+    
+    try {
+      const readResult = await db.listRFIs(projectId)
+
+      if (readResult.success && readResult.data) {
+        const found = readResult.data.find(r => r.id === createdRFIId)
+        if (found && found.subject === 'Test RFI - Foundation Details') {
+          updateTestStatus(suiteIndex, 1, {
+            status: 'pass',
+            message: 'RFI read successfully',
+            details: `Found ${readResult.data.length} RFIs`,
+            duration: Date.now() - readStartTime,
+          })
+        } else {
+          throw new Error('RFI not found in list')
+        }
+      } else {
+        throw new Error(readResult.error || 'Failed to read RFIs')
+      }
+    } catch (error) {
+      updateTestStatus(suiteIndex, 1, {
+        status: 'fail',
+        message: 'Failed to read RFI',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        duration: Date.now() - readStartTime,
+      })
+      return
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 300))
+
+    updateTestStatus(suiteIndex, 2, { status: 'running' })
+    const updateStartTime = Date.now()
+    
+    try {
+      const updateResult = await db.updateRFI(createdRFIId, {
+        status: 'in-review',
+        response: 'Engineering team is reviewing the foundation requirements.',
+      })
+
+      if (updateResult.success) {
+        const verifyResult = await db.listRFIs(projectId)
+        const updated = verifyResult.data?.find(r => r.id === createdRFIId)
+        
+        if (updated && updated.status === 'in-review') {
+          updateTestStatus(suiteIndex, 2, {
+            status: 'pass',
+            message: 'RFI updated successfully',
+            details: 'Status changed to in-review',
+            duration: Date.now() - updateStartTime,
+          })
+        } else {
+          throw new Error('Update not persisted')
+        }
+      } else {
+        throw new Error(updateResult.error || 'Failed to update RFI')
+      }
+    } catch (error) {
+      updateTestStatus(suiteIndex, 2, {
+        status: 'fail',
+        message: 'Failed to update RFI',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        duration: Date.now() - updateStartTime,
+      })
+      return
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 300))
+
+    updateTestStatus(suiteIndex, 3, { status: 'running' })
+    const deleteStartTime = Date.now()
+    
+    try {
+      const deleteResult = await db.deleteRFI(createdRFIId)
+
+      if (deleteResult.success) {
+        const verifyResult = await db.listRFIs(projectId)
+        const found = verifyResult.data?.find(r => r.id === createdRFIId)
+        
+        if (!found) {
+          updateTestStatus(suiteIndex, 3, {
+            status: 'pass',
+            message: 'RFI deleted successfully',
+            details: 'RFI removed from database',
+            duration: Date.now() - deleteStartTime,
+          })
+        } else {
+          throw new Error('RFI still exists after delete')
+        }
+      } else {
+        throw new Error(deleteResult.error || 'Failed to delete RFI')
+      }
+    } catch (error) {
+      updateTestStatus(suiteIndex, 3, {
+        status: 'fail',
+        message: 'Failed to delete RFI',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        duration: Date.now() - deleteStartTime,
+      })
+      return
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 300))
+
+    updateTestStatus(suiteIndex, 4, { status: 'running' })
+    const autoNumberStartTime = Date.now()
+    
+    try {
+      const rfi1 = await db.createRFI({
+        project_id: projectId,
+        subject: 'Auto Number Test 1',
+        question: 'Test question 1',
+        status: 'open',
+      })
+
+      const rfi2 = await db.createRFI({
+        project_id: projectId,
+        subject: 'Auto Number Test 2',
+        question: 'Test question 2',
+        status: 'open',
+      })
+
+      if (!rfi1.success || !rfi2.success) {
+        throw new Error('Failed to create test RFIs')
+      }
+
+      if (rfi1.data && rfi2.data) {
+        const num1 = rfi1.data.rfi_number
+        const num2 = rfi2.data.rfi_number
+        
+        if (num2 === num1 + 1) {
+          updateTestStatus(suiteIndex, 4, {
+            status: 'pass',
+            message: 'Auto-numbering works correctly',
+            details: `Sequential numbers: ${num1}, ${num2}`,
+            duration: Date.now() - autoNumberStartTime,
+          })
+        } else {
+          throw new Error(`Non-sequential numbers: ${num1}, ${num2}`)
+        }
+
+        await db.deleteRFI(rfi1.data.id)
+        await db.deleteRFI(rfi2.data.id)
+      } else {
+        throw new Error('RFI data missing')
+      }
+    } catch (error) {
+      updateTestStatus(suiteIndex, 4, {
+        status: 'fail',
+        message: 'Auto-numbering test failed',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        duration: Date.now() - autoNumberStartTime,
+      })
+    }
+  }
+
+  const runDrawingSetTests = async (projectId: string) => {
+    const suiteIndex = 1
+    let createdSetId = ''
+
+    updateTestStatus(suiteIndex, 0, { status: 'running' })
+    const startTime = Date.now()
+    
+    try {
+      const createResult = await db.createDrawingSet({
+        project_id: projectId,
+        name: 'Test Drawing Set - Structural',
+        status: 'IFA',
+        discipline: 'Structural',
+        set_number: 'S-100',
+      })
+
+      if (createResult.success && createResult.data) {
+        createdSetId = createResult.data.id
+        updateTestStatus(suiteIndex, 0, {
+          status: 'pass',
+          message: 'Drawing set created successfully',
+          details: `Set: ${createResult.data.name}`,
+          duration: Date.now() - startTime,
+        })
+      } else {
+        throw new Error(createResult.error || 'Failed to create drawing set')
+      }
+    } catch (error) {
+      updateTestStatus(suiteIndex, 0, {
+        status: 'fail',
+        message: 'Failed to create drawing set',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        duration: Date.now() - startTime,
+      })
+      return
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 300))
+
+    updateTestStatus(suiteIndex, 1, { status: 'running' })
+    const readStartTime = Date.now()
+    
+    try {
+      const readResult = await db.listDrawingSets(projectId)
+
+      if (readResult.success && readResult.data) {
+        const found = readResult.data.find(d => d.id === createdSetId)
+        if (found && found.name === 'Test Drawing Set - Structural') {
+          updateTestStatus(suiteIndex, 1, {
+            status: 'pass',
+            message: 'Drawing set read successfully',
+            details: `Found ${readResult.data.length} drawing sets`,
+            duration: Date.now() - readStartTime,
+          })
+        } else {
+          throw new Error('Drawing set not found in list')
+        }
+      } else {
+        throw new Error(readResult.error || 'Failed to read drawing sets')
+      }
+    } catch (error) {
+      updateTestStatus(suiteIndex, 1, {
+        status: 'fail',
+        message: 'Failed to read drawing set',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        duration: Date.now() - readStartTime,
+      })
+      return
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 300))
+
+    updateTestStatus(suiteIndex, 2, { status: 'running' })
+    const updateStartTime = Date.now()
+    
+    try {
+      const updateResult = await db.updateDrawingSetStatus(createdSetId, 'BFA')
+
+      if (updateResult.success) {
+        const verifyResult = await db.listDrawingSets(projectId)
+        const updated = verifyResult.data?.find(d => d.id === createdSetId)
+        
+        if (updated && updated.status === 'BFA') {
+          updateTestStatus(suiteIndex, 2, {
+            status: 'pass',
+            message: 'Drawing set status updated',
+            details: 'Status changed from IFA to BFA',
+            duration: Date.now() - updateStartTime,
+          })
+        } else {
+          throw new Error('Update not persisted')
+        }
+      } else {
+        throw new Error(updateResult.error || 'Failed to update drawing set')
+      }
+    } catch (error) {
+      updateTestStatus(suiteIndex, 2, {
+        status: 'fail',
+        message: 'Failed to update drawing set',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        duration: Date.now() - updateStartTime,
+      })
+      return
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 300))
+
+    updateTestStatus(suiteIndex, 3, { status: 'running' })
+    const deleteStartTime = Date.now()
+    
+    try {
+      const deleteResult = await db.deleteDrawingSet(createdSetId)
+
+      if (deleteResult.success) {
+        const verifyResult = await db.listDrawingSets(projectId)
+        const found = verifyResult.data?.find(d => d.id === createdSetId)
+        
+        if (!found) {
+          updateTestStatus(suiteIndex, 3, {
+            status: 'pass',
+            message: 'Drawing set deleted successfully',
+            details: 'Drawing set removed from database',
+            duration: Date.now() - deleteStartTime,
+          })
+        } else {
+          throw new Error('Drawing set still exists after delete')
+        }
+      } else {
+        throw new Error(deleteResult.error || 'Failed to delete drawing set')
+      }
+    } catch (error) {
+      updateTestStatus(suiteIndex, 3, {
+        status: 'fail',
+        message: 'Failed to delete drawing set',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        duration: Date.now() - deleteStartTime,
+      })
+      return
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 300))
+
+    updateTestStatus(suiteIndex, 4, { status: 'running' })
+    const workflowStartTime = Date.now()
+    
+    try {
+      const statuses: Array<DrawingSet['status']> = ['IFA', 'BFA', 'OFS', 'BFS', 'FFF']
+      const testSet = await db.createDrawingSet({
+        project_id: projectId,
+        name: 'Workflow Test Set',
+        status: 'IFA',
+      })
+
+      if (!testSet.success || !testSet.data) {
+        throw new Error('Failed to create test drawing set')
+      }
+
+      for (const status of statuses) {
+        const updateRes = await db.updateDrawingSetStatus(testSet.data.id, status)
+        if (!updateRes.success) {
+          throw new Error(`Failed to update status to ${status}`)
+        }
+
+        const verifyRes = await db.listDrawingSets(projectId)
+        const verified = verifyRes.data?.find(d => d.id === testSet.data!.id)
+        if (!verified || verified.status !== status) {
+          throw new Error(`Status change to ${status} not persisted`)
+        }
+      }
+
+      await db.deleteDrawingSet(testSet.data.id)
+
+      updateTestStatus(suiteIndex, 4, {
+        status: 'pass',
+        message: 'Status workflow gates work correctly',
+        details: `Tested ${statuses.length} status transitions`,
+        duration: Date.now() - workflowStartTime,
+      })
+    } catch (error) {
+      updateTestStatus(suiteIndex, 4, {
+        status: 'fail',
+        message: 'Workflow test failed',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        duration: Date.now() - workflowStartTime,
+      })
+    }
+  }
+
+  const runDrawingSheetTests = async (projectId: string) => {
+    const suiteIndex = 2
+    let createdSetId = ''
+    let createdSheetId = ''
+
+    updateTestStatus(suiteIndex, 0, { status: 'running' })
+    const startTime = Date.now()
+    
+    try {
+      const setResult = await db.createDrawingSet({
+        project_id: projectId,
+        name: 'Sheet Test Set',
+        status: 'IFA',
+      })
+
+      if (!setResult.success || !setResult.data) {
+        throw new Error('Failed to create parent drawing set')
+      }
+
+      createdSetId = setResult.data.id
+
+      const createResult = await db.createDrawingSheet({
+        set_id: createdSetId,
+        sheet_no: 'S-101',
+        title: 'Test Sheet - Column Details',
+        status: 'IFA',
+      })
+
+      if (createResult.success && createResult.data) {
+        createdSheetId = createResult.data.id
+        updateTestStatus(suiteIndex, 0, {
+          status: 'pass',
+          message: 'Drawing sheet created successfully',
+          details: `Sheet: ${createResult.data.sheet_no}`,
+          duration: Date.now() - startTime,
+        })
+      } else {
+        throw new Error(createResult.error || 'Failed to create drawing sheet')
+      }
+    } catch (error) {
+      updateTestStatus(suiteIndex, 0, {
+        status: 'fail',
+        message: 'Failed to create drawing sheet',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        duration: Date.now() - startTime,
+      })
+      if (createdSetId) await db.deleteDrawingSet(createdSetId)
+      return
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 300))
+
+    updateTestStatus(suiteIndex, 1, { status: 'running' })
+    const readStartTime = Date.now()
+    
+    try {
+      const readResult = await db.listDrawingSheets(createdSetId)
+
+      if (readResult.success && readResult.data) {
+        const found = readResult.data.find(s => s.id === createdSheetId)
+        if (found && found.sheet_no === 'S-101') {
+          updateTestStatus(suiteIndex, 1, {
+            status: 'pass',
+            message: 'Drawing sheet read successfully',
+            details: `Found ${readResult.data.length} sheets in set`,
+            duration: Date.now() - readStartTime,
+          })
+        } else {
+          throw new Error('Drawing sheet not found in list')
+        }
+      } else {
+        throw new Error(readResult.error || 'Failed to read drawing sheets')
+      }
+    } catch (error) {
+      updateTestStatus(suiteIndex, 1, {
+        status: 'fail',
+        message: 'Failed to read drawing sheet',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        duration: Date.now() - readStartTime,
+      })
+      await db.deleteDrawingSet(createdSetId)
+      return
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 300))
+
+    updateTestStatus(suiteIndex, 2, { status: 'running' })
+    const updateStartTime = Date.now()
+    
+    try {
+      const updateResult = await db.updateDrawingSheetStatus(createdSheetId, 'OFS')
+
+      if (updateResult.success) {
+        const verifyResult = await db.listDrawingSheets(createdSetId)
+        const updated = verifyResult.data?.find(s => s.id === createdSheetId)
+        
+        if (updated && updated.status === 'OFS') {
+          updateTestStatus(suiteIndex, 2, {
+            status: 'pass',
+            message: 'Sheet status updated successfully',
+            details: 'Status changed from IFA to OFS',
+            duration: Date.now() - updateStartTime,
+          })
+        } else {
+          throw new Error('Update not persisted')
+        }
+      } else {
+        throw new Error(updateResult.error || 'Failed to update sheet status')
+      }
+    } catch (error) {
+      updateTestStatus(suiteIndex, 2, {
+        status: 'fail',
+        message: 'Failed to update sheet status',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        duration: Date.now() - updateStartTime,
+      })
+      await db.deleteDrawingSet(createdSetId)
+      return
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 300))
+
+    updateTestStatus(suiteIndex, 3, { status: 'running' })
+    const deleteStartTime = Date.now()
+    
+    try {
+      const deleteResult = await db.deleteDrawingSheet(createdSheetId)
+
+      if (deleteResult.success) {
+        const verifyResult = await db.listDrawingSheets(createdSetId)
+        const found = verifyResult.data?.find(s => s.id === createdSheetId)
+        
+        if (!found) {
+          updateTestStatus(suiteIndex, 3, {
+            status: 'pass',
+            message: 'Drawing sheet deleted successfully',
+            details: 'Sheet removed from database',
+            duration: Date.now() - deleteStartTime,
+          })
+        } else {
+          throw new Error('Sheet still exists after delete')
+        }
+      } else {
+        throw new Error(deleteResult.error || 'Failed to delete sheet')
+      }
+    } catch (error) {
+      updateTestStatus(suiteIndex, 3, {
+        status: 'fail',
+        message: 'Failed to delete drawing sheet',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        duration: Date.now() - deleteStartTime,
+      })
+    }
+
+    await db.deleteDrawingSet(createdSetId)
+
+    await new Promise(resolve => setTimeout(resolve, 300))
+
+    updateTestStatus(suiteIndex, 4, { status: 'running' })
+    const gatesStartTime = Date.now()
+    
+    try {
+      const statuses: Array<DrawingSheet['status']> = ['IFA', 'BFA', 'OFS', 'BFS', 'FFF']
+      
+      const testSetRes = await db.createDrawingSet({
+        project_id: projectId,
+        name: 'Gates Test Set',
+        status: 'IFA',
+      })
+
+      if (!testSetRes.success || !testSetRes.data) {
+        throw new Error('Failed to create test set')
+      }
+
+      const testSheet = await db.createDrawingSheet({
+        set_id: testSetRes.data.id,
+        sheet_no: 'TEST-001',
+        title: 'Status Gates Test',
+        status: 'IFA',
+      })
+
+      if (!testSheet.success || !testSheet.data) {
+        throw new Error('Failed to create test sheet')
+      }
+
+      for (const status of statuses) {
+        const updateRes = await db.updateDrawingSheetStatus(testSheet.data.id, status)
+        if (!updateRes.success) {
+          throw new Error(`Failed to update status to ${status}`)
+        }
+
+        const verifyRes = await db.listDrawingSheets(testSetRes.data.id)
+        const verified = verifyRes.data?.find(s => s.id === testSheet.data!.id)
+        if (!verified || verified.status !== status) {
+          throw new Error(`Status change to ${status} not persisted`)
+        }
+      }
+
+      await db.deleteDrawingSet(testSetRes.data.id)
+
+      updateTestStatus(suiteIndex, 4, {
+        status: 'pass',
+        message: 'Sheet status gates work correctly',
+        details: `Tested all ${statuses.length} status gates`,
+        duration: Date.now() - gatesStartTime,
+      })
+    } catch (error) {
+      updateTestStatus(suiteIndex, 4, {
+        status: 'fail',
+        message: 'Status gates test failed',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        duration: Date.now() - gatesStartTime,
+      })
+    }
+  }
+
+  const runEquipmentTests = async (projectId: string) => {
+    const suiteIndex = 3
     let createdEquipmentId = ''
 
     updateTestStatus(suiteIndex, 0, { status: 'running' })
@@ -270,7 +905,7 @@ export function ElectronTestSuitePage() {
   }
 
   const runCostCodeTests = async (projectId: string) => {
-    const suiteIndex = 1
+    const suiteIndex = 4
     let createdCodeId = ''
 
     updateTestStatus(suiteIndex, 0, { status: 'running' })
@@ -473,7 +1108,7 @@ export function ElectronTestSuitePage() {
   }
 
   const runContractTests = async (projectId: string) => {
-    const suiteIndex = 2
+    const suiteIndex = 5
     let createdContractId = ''
 
     updateTestStatus(suiteIndex, 0, { status: 'running' })
@@ -697,6 +1332,9 @@ export function ElectronTestSuitePage() {
     toast.info('Starting test suite...')
 
     try {
+      await runRFITests(testProjectId)
+      await runDrawingSetTests(testProjectId)
+      await runDrawingSheetTests(testProjectId)
       await runEquipmentTests(testProjectId)
       await runCostCodeTests(testProjectId)
       await runContractTests(testProjectId)
@@ -753,7 +1391,7 @@ export function ElectronTestSuitePage() {
           <div className="flex-1">
             <h1 className="text-2xl font-bold">Electron Database Test Suite</h1>
             <p className="text-sm text-muted-foreground">
-              Verify Equipment, Cost Codes, and Contracts persistence in SQLite
+              Verify RFIs, Drawing Sets, Drawing Sheets, Equipment, Cost Codes, and Contracts persistence in SQLite
             </p>
           </div>
         </div>
