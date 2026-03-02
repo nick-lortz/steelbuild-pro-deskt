@@ -23,6 +23,7 @@ import {
   Export,
   Users
 } from '@phosphor-icons/react'
+import { GradientSettingsCard } from '@/components/settings/gradient-settings-card'
 
 interface GlobalSettings {
   company: {
@@ -181,7 +182,7 @@ export function SettingsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 h-auto gap-2">
+        <TabsList className="grid w-full grid-cols-4 lg:grid-cols-7 h-auto gap-2">
           <TabsTrigger value="company" className="flex items-center gap-2">
             <Buildings size={18} />
             <span className="hidden sm:inline">Company</span>
@@ -193,6 +194,10 @@ export function SettingsPage() {
           <TabsTrigger value="financial" className="flex items-center gap-2">
             <CurrencyDollar size={18} />
             <span className="hidden sm:inline">Financial</span>
+          </TabsTrigger>
+          <TabsTrigger value="appearance" className="flex items-center gap-2">
+            <Palette size={18} />
+            <span className="hidden sm:inline">Appearance</span>
           </TabsTrigger>
           <TabsTrigger value="notifications" className="flex items-center gap-2">
             <Bell size={18} />
@@ -419,6 +424,10 @@ export function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="appearance" className="space-y-6">
+          <GradientSettingsCard />
         </TabsContent>
 
         <TabsContent value="financial" className="space-y-6">
