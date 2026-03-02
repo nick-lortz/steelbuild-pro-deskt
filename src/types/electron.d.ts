@@ -132,6 +132,52 @@ export interface Notification {
   user_id?: string;
 }
 
+export interface ChangeOrder {
+  id: string;
+  project_id: string;
+  number: string;
+  title: string;
+  description?: string;
+  status: 'draft' | 'submitted' | 'approved' | 'rejected';
+  requested_by: string;
+  requested_date: string;
+  approved_date?: string;
+  line_items: Array<{
+    id: string;
+    description: string;
+    quantity: number;
+    unit: string;
+    unitPrice: number;
+    total: number;
+    cost_code_id?: string;
+  }>;
+  total: number;
+  created_at: string;
+  updated_at: string;
+  created_by?: string;
+  updated_by?: string;
+  deleted_at?: string;
+}
+
+export interface Contract {
+  id: string;
+  project_id: string;
+  contract_number: string;
+  title: string;
+  contract_type: 'lump-sum' | 'unit-price' | 'cost-plus' | 'time-and-materials';
+  value: number;
+  signed_date: string;
+  start_date: string;
+  completion_date?: string;
+  retainage: number;
+  terms?: string;
+  created_at: string;
+  updated_at: string;
+  created_by?: string;
+  updated_by?: string;
+  deleted_at?: string;
+}
+
 export interface DashboardCounts {
   rfi_count: number;
   equipment_count: number;
@@ -209,6 +255,15 @@ export interface SBPDB {
   listDrawingSheets: (setId: string, options?: { status?: string; limit?: number; offset?: number }) => Promise<DBResult<DrawingSheet[]>>;
   updateDrawingSheetStatus: (id: string, newStatus: DrawingSheet['status'], userId?: string) => Promise<DBResult>;
   deleteDrawingSheet: (id: string, userId?: string) => Promise<DBResult>;
+  createChangeOrder: (data: Partial<ChangeOrder>) => Promise<DBResult<ChangeOrder>>;
+  listChangeOrders: (projectId: string, options?: { status?: string; limit?: number; offset?: number }) => Promise<DBResult<ChangeOrder[]>>;
+  updateChangeOrder: (id: string, data: Partial<ChangeOrder>) => Promise<DBResult>;
+  deleteChangeOrder: (id: string, userId?: string) => Promise<DBResult>;
+  createContract: (data: Partial<Contract>) => Promise<DBResult<Contract>>;
+  listContracts: (projectId: string, options?: { limit?: number; offset?: number }) => Promise<DBResult<Contract[]>>;
+  updateContract: (id: string, data: Partial<Contract>) => Promise<DBResult>;
+  deleteContract: (id: string, userId?: string) => Promise<DBResult>;
+  calculateAutomatedSOV: (projectId: string) => Promise<DBResult<any>>;
 }
 
 declare global {

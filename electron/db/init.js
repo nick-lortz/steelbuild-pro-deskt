@@ -114,12 +114,14 @@ function createTablesIfNotExists() {
       baseline_end_date TEXT,
       status TEXT NOT NULL DEFAULT 'not-started',
       percent_complete REAL NOT NULL DEFAULT 0,
+      cost_code_id TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       created_by TEXT,
       updated_by TEXT,
       deleted_at TEXT,
-      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+      FOREIGN KEY (cost_code_id) REFERENCES cost_codes(id) ON DELETE SET NULL
     );
 
     CREATE TABLE IF NOT EXISTS pma_insights (
@@ -195,10 +197,53 @@ function createTablesIfNotExists() {
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS change_orders (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      number TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT,
+      status TEXT NOT NULL DEFAULT 'draft',
+      requested_by TEXT NOT NULL,
+      requested_date TEXT NOT NULL,
+      approved_date TEXT,
+      line_items_json TEXT NOT NULL DEFAULT '[]',
+      total REAL NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      created_by TEXT,
+      updated_by TEXT,
+      deleted_at TEXT,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+      UNIQUE(project_id, number)
+    );
+
+    CREATE TABLE IF NOT EXISTS contracts (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      contract_number TEXT NOT NULL,
+      title TEXT NOT NULL,
+      contract_type TEXT NOT NULL DEFAULT 'lump-sum',
+      value REAL NOT NULL DEFAULT 0,
+      signed_date TEXT NOT NULL,
+      start_date TEXT NOT NULL,
+      completion_date TEXT,
+      retainage REAL NOT NULL DEFAULT 10,
+      terms TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      created_by TEXT,
+      updated_by TEXT,
+      deleted_at TEXT,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+      UNIQUE(project_id, contract_number)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_rfis_project_id ON rfis(project_id);
     CREATE INDEX IF NOT EXISTS idx_equipment_project_id ON equipment(project_id);
     CREATE INDEX IF NOT EXISTS idx_cost_codes_project_id ON cost_codes(project_id);
     CREATE INDEX IF NOT EXISTS idx_tasks_project_id ON tasks(project_id);
+    CREATE INDEX IF NOT EXISTS idx_task_cost_code ON tasks(cost_code_id);
     CREATE INDEX IF NOT EXISTS idx_pma_insights_project_id ON pma_insights(project_id);
     CREATE INDEX IF NOT EXISTS idx_pma_insights_status ON pma_insights(status);
     CREATE INDEX IF NOT EXISTS idx_audit_log_entity ON audit_log(entity_type, entity_id);
@@ -208,6 +253,9 @@ function createTablesIfNotExists() {
     CREATE INDEX IF NOT EXISTS idx_drawing_sheets_status ON drawing_sheets(status);
     CREATE INDEX IF NOT EXISTS idx_notifications_project_id ON notifications(project_id);
     CREATE INDEX IF NOT EXISTS idx_notifications_read_at ON notifications(read_at);
+    CREATE INDEX IF NOT EXISTS idx_change_orders_project_id ON change_orders(project_id);
+    CREATE INDEX IF NOT EXISTS idx_change_orders_status ON change_orders(status);
+    CREATE INDEX IF NOT EXISTS idx_contracts_project_id ON contracts(project_id);
   `);
 }
 

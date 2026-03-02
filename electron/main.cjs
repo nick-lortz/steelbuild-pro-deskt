@@ -37,6 +37,15 @@ const {
   listDrawingSheets,
   updateDrawingSheetStatus,
   deleteDrawingSheet,
+  createChangeOrder,
+  listChangeOrders,
+  updateChangeOrder,
+  deleteChangeOrder,
+  createContract,
+  listContracts,
+  updateContract,
+  deleteContract,
+  calculateAutomatedSOV,
 } = require("./db/queries");
 
 const isDev = !app.isPackaged;
@@ -728,3 +737,76 @@ ipcMain.handle("db:deleteDrawingSheet", async (event, id, userId) => {
     return { success: false, error: error.message };
   }
 });
+
+ipcMain.handle("db:createChangeOrder", async (event, data) => {
+  try {
+    return await createChangeOrder(data);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:listChangeOrders", async (event, projectId, options) => {
+  try {
+    return await listChangeOrders(projectId, options);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:updateChangeOrder", async (event, id, data) => {
+  try {
+    return await updateChangeOrder(id, data);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:deleteChangeOrder", async (event, id, userId) => {
+  try {
+    return await deleteChangeOrder(id, userId);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:createContract", async (event, data) => {
+  try {
+    return await createContract(data);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:listContracts", async (event, projectId, options) => {
+  try {
+    return await listContracts(projectId, options);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:updateContract", async (event, data) => {
+  try {
+    return await updateContract(id, data);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:deleteContract", async (event, id, userId) => {
+  try {
+    return await deleteContract(id, userId);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:calculateAutomatedSOV", async (event, projectId) => {
+  try {
+    return await calculateAutomatedSOV(projectId);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+

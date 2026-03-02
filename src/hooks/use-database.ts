@@ -22,6 +22,15 @@ const fallbackDB = {
   generatePMAInsights: async () => ({ success: false, data: [] as PMAInsight[] }),
   resolvePMAInsight: async () => ({ success: false, error: 'Not running in desktop mode' }),
   dismissPMAInsight: async () => ({ success: false, error: 'Not running in desktop mode' }),
+  createChangeOrder: async () => ({ success: false, error: 'Not running in desktop mode' }),
+  listChangeOrders: async () => ({ success: false, data: [] }),
+  updateChangeOrder: async () => ({ success: false, error: 'Not running in desktop mode' }),
+  deleteChangeOrder: async () => ({ success: false, error: 'Not running in desktop mode' }),
+  createContract: async () => ({ success: false, error: 'Not running in desktop mode' }),
+  listContracts: async () => ({ success: false, data: [] }),
+  updateContract: async () => ({ success: false, error: 'Not running in desktop mode' }),
+  deleteContract: async () => ({ success: false, error: 'Not running in desktop mode' }),
+  calculateAutomatedSOV: async () => ({ success: false, data: [] }),
 };
 
 export function useDatabase() {

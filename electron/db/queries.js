@@ -1067,6 +1067,347 @@ async function deleteDrawingSheet(id, userId = null) {
   return { success: true };
 }
 
+async function createChangeOrder(data) {
+  const sqliteDb = getSQLiteDB();
+  const id = uuidv4();
+  const now = new Date().toISOString();
+  
+  const changeOrder = {
+    id,
+    project_id: data.project_id,
+    number: data.number,
+    title: data.title,
+    description: data.description || null,
+    status: data.status || 'draft',
+    requested_by: data.requested_by,
+    requested_date: data.requested_date || now,
+    approved_date: data.approved_date || null,
+    line_items_json: data.line_items ? JSON.stringify(data.line_items) : '[]',
+    total: data.total || 0,
+    created_at: now,
+    updated_at: now,
+    created_by: data.created_by || null,
+  };
+  
+  sqliteDb.prepare(`
+    INSERT INTO change_orders (id, project_id, number, title, description, status, requested_by, requested_date, approved_date, line_items_json, total, created_at, updated_at, created_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    changeOrder.id,
+    changeOrder.project_id,
+    changeOrder.number,
+    changeOrder.title,
+    changeOrder.description,
+    changeOrder.status,
+    changeOrder.requested_by,
+    changeOrder.requested_date,
+    changeOrder.approved_date,
+    changeOrder.line_items_json,
+    changeOrder.total,
+    changeOrder.created_at,
+    changeOrder.updated_at,
+    changeOrder.created_by
+  );
+  
+  logAudit('change_order', id, 'create', data.project_id, changeOrder, data.created_by);
+  
+  return { success: true, data: { ...changeOrder, line_items: data.line_items || [] } };
+}
+
+async function listChangeOrders(projectId, options = {}) {
+  const sqliteDb = getSQLiteDB();
+  const { status, limit = 100, offset = 0 } = options;
+  
+  const query = `
+    SELECT * FROM change_orders 
+    WHERE project_id = ? AND deleted_at IS NULL
+    ${status ? 'AND status = ?' : ''}
+    ORDER BY created_at DESC
+    LIMIT ? OFFSET ?
+  `;
+  
+  const params = status 
+    ? [projectId, status, limit, offset]
+    : [projectId, limit, offset];
+  
+  const results = sqliteDb.prepare(query).all(...params);
+  
+  return { 
+    success: true, 
+    data: results.map(co => ({
+      ...co,
+      line_items: co.line_items_json ? JSON.parse(co.line_items_json) : []
+    }))
+  };
+}
+
+async function updateChangeOrder(id, data) {
+  const sqliteDb = getSQLiteDB();
+  const now = new Date().toISOString();
+  
+  const existing = sqliteDb.prepare('SELECT * FROM change_orders WHERE id = ?').get(id);
+  if (!existing) {
+    return { success: false, error: 'Change order not found' };
+  }
+  
+  const updateFields = [];
+  const values = [];
+  
+  if (data.title !== undefined) {
+    updateFields.push('title = ?');
+    values.push(data.title);
+  }
+  if (data.description !== undefined) {
+    updateFields.push('description = ?');
+    values.push(data.description);
+  }
+  if (data.status !== undefined) {
+    updateFields.push('status = ?');
+    values.push(data.status);
+    if (data.status === 'approved' && !existing.approved_date) {
+      updateFields.push('approved_date = ?');
+      values.push(now);
+    }
+  }
+  if (data.line_items !== undefined) {
+    updateFields.push('line_items_json = ?');
+    values.push(JSON.stringify(data.line_items));
+    const total = data.line_items.reduce((sum, item) => sum + (item.total || 0), 0);
+    updateFields.push('total = ?');
+    values.push(total);
+  }
+  
+  updateFields.push('updated_at = ?');
+  values.push(now);
+  
+  if (data.updated_by !== undefined) {
+    updateFields.push('updated_by = ?');
+    values.push(data.updated_by);
+  }
+  
+  values.push(id);
+  
+  sqliteDb.prepare(`UPDATE change_orders SET ${updateFields.join(', ')} WHERE id = ?`).run(...values);
+  logAudit('change_order', id, 'update', existing.project_id, data, data.updated_by);
+  
+  if (data.status === 'approved' && existing.status !== 'approved') {
+    await recalculateProjectBudget(existing.project_id);
+  }
+  
+  return { success: true };
+}
+
+async function deleteChangeOrder(id, userId = null) {
+  const sqliteDb = getSQLiteDB();
+  const now = new Date().toISOString();
+  
+  const existing = sqliteDb.prepare('SELECT * FROM change_orders WHERE id = ?').get(id);
+  if (!existing) {
+    return { success: false, error: 'Change order not found' };
+  }
+  
+  sqliteDb.prepare('UPDATE change_orders SET deleted_at = ? WHERE id = ?').run(now, id);
+  logAudit('change_order', id, 'delete', existing.project_id, null, userId);
+  
+  if (existing.status === 'approved') {
+    await recalculateProjectBudget(existing.project_id);
+  }
+  
+  return { success: true };
+}
+
+async function createContract(data) {
+  const sqliteDb = getSQLiteDB();
+  const id = uuidv4();
+  const now = new Date().toISOString();
+  
+  const contract = {
+    id,
+    project_id: data.project_id,
+    contract_number: data.contract_number,
+    title: data.title,
+    contract_type: data.contract_type || 'lump-sum',
+    value: data.value || 0,
+    signed_date: data.signed_date || now,
+    start_date: data.start_date || now,
+    completion_date: data.completion_date || null,
+    retainage: data.retainage || 10,
+    terms: data.terms || null,
+    created_at: now,
+    updated_at: now,
+    created_by: data.created_by || null,
+  };
+  
+  sqliteDb.prepare(`
+    INSERT INTO contracts (id, project_id, contract_number, title, contract_type, value, signed_date, start_date, completion_date, retainage, terms, created_at, updated_at, created_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    contract.id,
+    contract.project_id,
+    contract.contract_number,
+    contract.title,
+    contract.contract_type,
+    contract.value,
+    contract.signed_date,
+    contract.start_date,
+    contract.completion_date,
+    contract.retainage,
+    contract.terms,
+    contract.created_at,
+    contract.updated_at,
+    contract.created_by
+  );
+  
+  logAudit('contract', id, 'create', data.project_id, contract, data.created_by);
+  
+  return { success: true, data: contract };
+}
+
+async function listContracts(projectId, options = {}) {
+  const sqliteDb = getSQLiteDB();
+  const { limit = 100, offset = 0 } = options;
+  
+  const query = `
+    SELECT * FROM contracts 
+    WHERE project_id = ? AND deleted_at IS NULL
+    ORDER BY signed_date DESC
+    LIMIT ? OFFSET ?
+  `;
+  
+  const results = sqliteDb.prepare(query).all(projectId, limit, offset);
+  return { success: true, data: results };
+}
+
+async function updateContract(id, data) {
+  const sqliteDb = getSQLiteDB();
+  const now = new Date().toISOString();
+  
+  const existing = sqliteDb.prepare('SELECT * FROM contracts WHERE id = ?').get(id);
+  if (!existing) {
+    return { success: false, error: 'Contract not found' };
+  }
+  
+  const updateFields = [];
+  const values = [];
+  
+  const allowedFields = ['contract_number', 'title', 'contract_type', 'value', 'signed_date', 'start_date', 'completion_date', 'retainage', 'terms'];
+  allowedFields.forEach(field => {
+    if (data[field] !== undefined) {
+      updateFields.push(`${field} = ?`);
+      values.push(data[field]);
+    }
+  });
+  
+  updateFields.push('updated_at = ?');
+  values.push(now);
+  
+  if (data.updated_by !== undefined) {
+    updateFields.push('updated_by = ?');
+    values.push(data.updated_by);
+  }
+  
+  values.push(id);
+  
+  sqliteDb.prepare(`UPDATE contracts SET ${updateFields.join(', ')} WHERE id = ?`).run(...values);
+  logAudit('contract', id, 'update', existing.project_id, data, data.updated_by);
+  
+  return { success: true };
+}
+
+async function deleteContract(id, userId = null) {
+  const sqliteDb = getSQLiteDB();
+  const now = new Date().toISOString();
+  
+  const existing = sqliteDb.prepare('SELECT * FROM contracts WHERE id = ?').get(id);
+  if (!existing) {
+    return { success: false, error: 'Contract not found' };
+  }
+  
+  sqliteDb.prepare('UPDATE contracts SET deleted_at = ? WHERE id = ?').run(now, id);
+  logAudit('contract', id, 'delete', existing.project_id, null, userId);
+  
+  return { success: true };
+}
+
+async function recalculateProjectBudget(projectId) {
+  const sqliteDb = getSQLiteDB();
+  
+  const approvedCOs = sqliteDb.prepare(`
+    SELECT total FROM change_orders 
+    WHERE project_id = ? AND status = 'approved' AND deleted_at IS NULL
+  `).all(projectId);
+  
+  const coTotal = approvedCOs.reduce((sum, co) => sum + (co.total || 0), 0);
+  
+  const costCodes = sqliteDb.prepare(`
+    SELECT id, budget_amount FROM cost_codes 
+    WHERE project_id = ? AND deleted_at IS NULL
+  `).all(projectId);
+  
+  for (const cc of costCodes) {
+    const lineItems = sqliteDb.prepare(`
+      SELECT SUM(json_extract(value, '$.total')) as co_impact
+      FROM change_orders, json_each(change_orders.line_items_json)
+      WHERE change_orders.project_id = ? 
+        AND change_orders.status = 'approved'
+        AND change_orders.deleted_at IS NULL
+        AND json_extract(value, '$.cost_code_id') = ?
+    `).get(projectId, cc.id);
+    
+    if (lineItems && lineItems.co_impact) {
+      const newBudget = cc.budget_amount + lineItems.co_impact;
+      sqliteDb.prepare('UPDATE cost_codes SET budget_amount = ? WHERE id = ?').run(newBudget, cc.id);
+    }
+  }
+  
+  return { success: true };
+}
+
+async function calculateAutomatedSOV(projectId) {
+  const sqliteDb = getSQLiteDB();
+  const db = getDatabase();
+  
+  const costCodes = db
+    .select()
+    .from(cost_codes)
+    .where(and(
+      eq(cost_codes.project_id, projectId),
+      isNull(cost_codes.deleted_at)
+    ))
+    .all();
+  
+  const tasks = sqliteDb.prepare(`
+    SELECT * FROM tasks 
+    WHERE project_id = ? AND deleted_at IS NULL
+  `).all(projectId);
+  
+  const sovItems = [];
+  
+  for (const cc of costCodes) {
+    const relatedTasks = tasks.filter(t => t.cost_code_id === cc.id);
+    
+    let percentComplete = 0;
+    if (relatedTasks.length > 0) {
+      percentComplete = relatedTasks.reduce((sum, t) => sum + t.percent_complete, 0) / relatedTasks.length;
+    }
+    
+    const budgetWithCOs = cc.budget_amount;
+    const billableToDate = (budgetWithCOs * percentComplete) / 100;
+    
+    sovItems.push({
+      cost_code_id: cc.id,
+      cost_code: cc.code,
+      description: cc.description,
+      scheduled_value: budgetWithCOs,
+      percent_complete: Math.round(percentComplete),
+      completed_to_date: billableToDate,
+      balance_to_finish: budgetWithCOs - billableToDate,
+    });
+  }
+  
+  return { success: true, data: sovItems };
+}
+
 module.exports = {
   createRFI,
   listRFIs,
@@ -1102,4 +1443,13 @@ module.exports = {
   listDrawingSheets,
   updateDrawingSheetStatus,
   deleteDrawingSheet,
+  createChangeOrder,
+  listChangeOrders,
+  updateChangeOrder,
+  deleteChangeOrder,
+  createContract,
+  listContracts,
+  updateContract,
+  deleteContract,
+  calculateAutomatedSOV,
 };
