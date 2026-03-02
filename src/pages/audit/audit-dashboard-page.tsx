@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { useKV } from '@github/spark/hooks'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -6,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { CheckCircle, Warning, XCircle, Play, Wrench, ClockCounterClockwise, Database } from '@phosphor-icons/react'
+import { CheckCircle, Warning, XCircle, Play, Wrench, ClockCounterClockwise, Database, TestTube } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { checkDataIntegrity, type IntegrityFinding } from '@/lib/functions/data-integrity'
 import type { Project, RFI, Task, Budget, CostCode, SOVItem } from '@/lib/types'
@@ -128,10 +129,18 @@ export function AuditDashboardPage() {
             Monitor and fix data consistency issues across the system
           </p>
         </div>
-        <Button onClick={runAudit} disabled={isRunning}>
-          <Play className="w-4 h-4 mr-2" />
-          {isRunning ? 'Running Audit...' : 'Run Full Audit'}
-        </Button>
+        <div className="flex gap-2">
+          <Link to="/electron-test">
+            <Button variant="outline">
+              <TestTube className="w-4 h-4 mr-2" />
+              Electron Test Suite
+            </Button>
+          </Link>
+          <Button onClick={runAudit} disabled={isRunning}>
+            <Play className="w-4 h-4 mr-2" />
+            {isRunning ? 'Running Audit...' : 'Run Full Audit'}
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

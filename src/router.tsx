@@ -25,6 +25,7 @@ import { CostCodesPage } from '@/pages/cost-codes/cost-codes-page'
 import { DailyLogsPage } from '@/pages/daily-logs/daily-logs-page'
 import { MeetingsPage } from '@/pages/meetings/meetings-page'
 import { AuditDashboardPage } from '@/pages/audit/audit-dashboard-page'
+import { ElectronTestSuitePage } from '@/pages/audit/electron-test-suite'
 import { GlobalEquipmentPage } from '@/pages/global/equipment-page'
 import { GlobalCostCodesPage } from '@/pages/global/cost-codes-page'
 import { PortfolioPulsePage } from '@/pages/portfolio/portfolio-pulse-page'
@@ -68,6 +69,10 @@ export const router = createBrowserRouter([
       {
         path: 'audit',
         element: <AuditDashboardPage />,
+      },
+      {
+        path: 'electron-test',
+        element: <ElectronTestSuitePage />,
       },
       {
         path: 'settings',
