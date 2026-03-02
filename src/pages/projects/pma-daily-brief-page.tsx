@@ -32,6 +32,7 @@ import { Progress } from '@/components/ui/progress'
 import { toast } from 'sonner'
 import { generateProjectInsights, generateDailyBrief, type PMAInsight } from '@/lib/services/pma-heuristics'
 import { useKV } from '@github/spark/hooks'
+import { CriticalAlertIndicator } from '@/components/pma/critical-alert-indicator'
 
 export function PMADailyBriefPage() {
   const { projectId } = useParams()
@@ -223,10 +224,12 @@ export function PMADailyBriefPage() {
         </div>
       </div>
 
-      <Card className="bg-gradient-to-br from-primary/5 via-primary/3 to-accent/5 border-primary/20">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <Card className="bg-gradient-to-br from-primary/5 via-primary/3 to-accent/5 border-primary/20">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
               <Calendar size={24} weight="duotone" className="text-primary" />
               <CardTitle>Daily Summary</CardTitle>
             </div>
@@ -321,6 +324,12 @@ export function PMADailyBriefPage() {
           )}
         </CardContent>
       </Card>
+        </div>
+        
+        <div className="space-y-6">
+          <CriticalAlertIndicator variant="widget" autoScan={true} scanInterval={300000} />
+        </div>
+      </div>
 
       <Card>
         <CardHeader>

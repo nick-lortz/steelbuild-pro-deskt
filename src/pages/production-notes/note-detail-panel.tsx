@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -17,7 +18,8 @@ import {
   Tag,
   Link as LinkIcon,
   Eye,
-  EyeSlash
+  EyeSlash,
+  ArrowsClockwise
 } from '@phosphor-icons/react'
 import type { ProductionNote } from '@/lib/types'
 import { toast } from 'sonner'
@@ -40,11 +42,14 @@ interface NoteDetailPanelProps {
 }
 
 export function NoteDetailPanel({ note, onUpdate, onDelete }: NoteDetailPanelProps) {
+  const { projectId } = useParams()
+  const navigate = useNavigate()
   const [isEditing, setIsEditing] = useState(false)
   const [editedNote, setEditedNote] = useState<ProductionNote>(note)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [newBlocker, setNewBlocker] = useState('')
   const [waitingOnParty, setWaitingOnParty] = useState(note.waitingOnParty || '')
+  const [convertingToRFI, setConvertingToRFI] = useState(false)
 
   const handleSave = () => {
     if (!editedNote.title || !editedNote.body) {
@@ -98,6 +103,38 @@ export function NoteDetailPanel({ note, onUpdate, onDelete }: NoteDetailPanelPro
     toast.success('Note deleted successfully')
   }
 
+  const handleConvertToRFI = async () => {
+    if (!projectId) {
+      toast.error('Project ID not found')
+      return
+    }
+
+    setConvertingToRFI(true)
+    
+    try {
+      if (window.SBP?.db) {
+        const result = await window.SBP.db.convertProductionNoteToRFI(note.id, 'current-user')
+        
+        if (result.success && result.data) {
+          toast.success('Successfully converted to RFI! Redirecting...')
+          
+          setTimeout(() => {
+            navigate(`/projects/${projectId}/rfis`)
+          }, 1500)
+        } else {
+          toast.error(result.error || 'Failed to convert to RFI')
+        }
+      } else {
+        toast.error('Database not available')
+      }
+    } catch (error) {
+      console.error('Error converting to RFI:', error)
+      toast.error('Failed to convert to RFI')
+    } finally {
+      setConvertingToRFI(false)
+    }
+  }
+
   const removeBlocker = (index: number) => {
     const updatedBlockers = editedNote.blockers.filter((_, i) => i !== index)
     setEditedNote(prev => ({
@@ -146,6 +183,16 @@ export function NoteDetailPanel({ note, onUpdate, onDelete }: NoteDetailPanelPro
         <div className="flex items-center gap-2">
           {!isEditing ? (
             <>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={handleConvertToRFI}
+                disabled={convertingToRFI}
+                className="gap-2"
+              >
+                <ArrowsClockwise size={16} className={cn(convertingToRFI && 'animate-spin')} />
+                Convert to RFI
+              </Button>
               <Button size="sm" variant="outline" onClick={() => setIsEditing(true)}>
                 <PencilSimple size={16} className="mr-1" />
                 Edit
