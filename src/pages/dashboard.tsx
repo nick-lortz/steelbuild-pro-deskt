@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { projectsDb, equipmentDb, checklistsDb } from '@/lib/db'
+import { projectsDb, equipmentDb, checklistsDb, rfisDb } from '@/lib/db'
 import { useKV } from '@github/spark/hooks'
 import type { Project, Equipment, Checklist, RFI, Task, Alert as AlertType, Submittal } from '@/lib/types'
 
@@ -13,21 +13,23 @@ export function DashboardPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [equipment, setEquipment] = useState<Equipment[]>([])
   const [checklists, setChecklists] = useState<Checklist[]>([])
-  const [allRFIs] = useKV<RFI[]>('rfis', [])
+  const [rfis, setRfis] = useState<RFI[]>([])
   const [allTasks] = useKV<Task[]>('tasks', [])
   const [alerts] = useKV<AlertType[]>('alerts', [])
   const [submittals] = useKV<Submittal[]>('submittals', [])
 
   useEffect(() => {
     const loadData = async () => {
-      const [p, e, c] = await Promise.all([
+      const [p, e, c, r] = await Promise.all([
         projectsDb.getAll(),
         equipmentDb.getAll(),
         checklistsDb.getAll(),
+        rfisDb.getAll(),
       ])
       setProjects(p)
       setEquipment(e)
       setChecklists(c)
+      setRfis(r)
     }
     loadData()
   }, [])
@@ -37,7 +39,7 @@ export function DashboardPage() {
   const pendingChecklists = checklists.filter((c) => c.status !== 'completed')
   
   const criticalAlerts = alerts.filter(a => a.severity === 'critical' && !a.dismissed).length
-  const openRFIs = allRFIs.filter(r => r.status === 'open').length
+  const openRFIs = rfis.filter(r => r.status === 'open').length
   const overdueTasks = allTasks.filter(t => {
     if (t.status === 'completed') return false
     if (!t.endDate) return false

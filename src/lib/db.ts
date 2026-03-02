@@ -10,6 +10,8 @@ import type {
   Equipment,
   ChecklistTemplate,
   Checklist,
+  RFI,
+  EquipmentLog,
 } from './types'
 
 const KV_KEYS = {
@@ -21,6 +23,8 @@ const KV_KEYS = {
   EQUIPMENT: 'equipment',
   CHECKLIST_TEMPLATES: 'checklistTemplates',
   CHECKLISTS: 'checklists',
+  RFIS: 'rfis',
+  EQUIPMENT_LOGS: 'equipmentLogs',
 }
 
 export const projectsDb = {
@@ -354,6 +358,108 @@ export const checklistsDb = {
     await spark.kv.set(
       KV_KEYS.CHECKLISTS,
       checklists.filter((c) => c.id !== id)
+    )
+  },
+}
+
+export const rfisDb = {
+  async getAll(): Promise<RFI[]> {
+    const rfis = await spark.kv.get<RFI[]>(KV_KEYS.RFIS)
+    return rfis || []
+  },
+
+  async getByProject(projectId: string): Promise<RFI[]> {
+    const rfis = await this.getAll()
+    return rfis.filter((r) => r.projectId === projectId)
+  },
+
+  async getById(id: string): Promise<RFI | undefined> {
+    const rfis = await this.getAll()
+    return rfis.find((r) => r.id === id)
+  },
+
+  async create(rfi: Omit<RFI, 'id' | 'createdAt'>): Promise<RFI> {
+    const rfis = await this.getAll()
+    
+    const existingRFI = rfis.find(
+      (r) => r.projectId === rfi.projectId && r.number === rfi.number
+    )
+    if (existingRFI) {
+      throw new Error(`RFI number ${rfi.number} already exists for this project`)
+    }
+
+    const newRFI: RFI = {
+      ...rfi,
+      id: crypto.randomUUID(),
+      createdAt: new Date().toISOString(),
+    }
+    await spark.kv.set(KV_KEYS.RFIS, [...rfis, newRFI])
+    return newRFI
+  },
+
+  async update(id: string, updates: Partial<RFI>): Promise<RFI> {
+    const rfis = await this.getAll()
+    const index = rfis.findIndex((r) => r.id === id)
+    if (index === -1) throw new Error('RFI not found')
+    
+    const updated = { ...rfis[index], ...updates, id }
+    rfis[index] = updated
+    await spark.kv.set(KV_KEYS.RFIS, rfis)
+    return updated
+  },
+
+  async delete(id: string): Promise<void> {
+    const rfis = await this.getAll()
+    await spark.kv.set(
+      KV_KEYS.RFIS,
+      rfis.filter((r) => r.id !== id)
+    )
+  },
+}
+
+export const equipmentLogsDb = {
+  async getAll(): Promise<EquipmentLog[]> {
+    const logs = await spark.kv.get<EquipmentLog[]>(KV_KEYS.EQUIPMENT_LOGS)
+    return logs || []
+  },
+
+  async getByEquipment(equipmentId: string): Promise<EquipmentLog[]> {
+    const logs = await this.getAll()
+    return logs.filter((l) => l.equipmentId === equipmentId)
+  },
+
+  async getByProject(projectId: string): Promise<EquipmentLog[]> {
+    const logs = await this.getAll()
+    return logs.filter((l) => l.projectId === projectId)
+  },
+
+  async create(log: Omit<EquipmentLog, 'id' | 'createdAt'>): Promise<EquipmentLog> {
+    const logs = await this.getAll()
+    const newLog: EquipmentLog = {
+      ...log,
+      id: crypto.randomUUID(),
+      createdAt: new Date().toISOString(),
+    }
+    await spark.kv.set(KV_KEYS.EQUIPMENT_LOGS, [...logs, newLog])
+    return newLog
+  },
+
+  async update(id: string, updates: Partial<EquipmentLog>): Promise<EquipmentLog> {
+    const logs = await this.getAll()
+    const index = logs.findIndex((l) => l.id === id)
+    if (index === -1) throw new Error('Equipment log not found')
+    
+    const updated = { ...logs[index], ...updates, id }
+    logs[index] = updated
+    await spark.kv.set(KV_KEYS.EQUIPMENT_LOGS, logs)
+    return updated
+  },
+
+  async delete(id: string): Promise<void> {
+    const logs = await this.getAll()
+    await spark.kv.set(
+      KV_KEYS.EQUIPMENT_LOGS,
+      logs.filter((l) => l.id !== id)
     )
   },
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { Plus, Tag, PencilSimple, Trash } from '@phosphor-icons/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -9,13 +9,14 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useKV } from '@github/spark/hooks'
 import { toast } from 'sonner'
+import { costCodesDb } from '@/lib/db'
 import type { CostCode } from '@/lib/types'
 
 export function CostCodesPage() {
   const { projectId } = useParams()
-  const [costCodes, setCostCodes] = useKV<CostCode[]>(`cost-codes-${projectId}`, [])
+  const [costCodes, setCostCodes] = useState<CostCode[]>([])
+  const [loading, setLoading] = useState(true)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [editingCode, setEditingCode] = useState<CostCode | null>(null)
@@ -26,30 +27,51 @@ export function CostCodesPage() {
     budgetAmount: '',
   })
 
-  const totalBudget = costCodes?.reduce((sum, cc) => sum + (cc.budgetAmount || 0), 0) || 0
-  const totalActual = costCodes?.reduce((sum, cc) => sum + (cc.actualAmount || 0), 0) || 0
+  const loadCostCodes = async () => {
+    if (!projectId) return
+    setLoading(true)
+    try {
+      const projectCostCodes = await costCodesDb.getByProject(projectId)
+      setCostCodes(projectCostCodes)
+    } catch (error) {
+      console.error('Failed to load cost codes:', error)
+      toast.error('Failed to load cost codes')
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  const handleCreate = () => {
+  useEffect(() => {
+    loadCostCodes()
+  }, [projectId])
+
+  const totalBudget = costCodes.reduce((sum, cc) => sum + (cc.budgetAmount || 0), 0)
+  const totalActual = costCodes.reduce((sum, cc) => sum + (cc.actualAmount || 0), 0)
+
+  const handleCreate = async () => {
     if (!formData.code || !formData.name) {
       toast.error('Please fill in required fields')
       return
     }
 
-    const newCode: CostCode = {
-      id: crypto.randomUUID(),
-      code: formData.code,
-      name: formData.name,
-      category: formData.category,
-      projectId,
-      budgetAmount: formData.budgetAmount ? parseFloat(formData.budgetAmount) : undefined,
-      actualAmount: 0,
-      createdAt: new Date().toISOString(),
-    }
+    try {
+      await costCodesDb.create({
+        code: formData.code,
+        name: formData.name,
+        category: formData.category,
+        projectId,
+        budgetAmount: formData.budgetAmount ? parseFloat(formData.budgetAmount) : undefined,
+        actualAmount: 0,
+      })
 
-    setCostCodes(current => [...(current || []), newCode])
-    setIsCreateOpen(false)
-    setFormData({ code: '', name: '', category: 'labor', budgetAmount: '' })
-    toast.success('Cost code created')
+      await loadCostCodes()
+      setIsCreateOpen(false)
+      setFormData({ code: '', name: '', category: 'labor', budgetAmount: '' })
+      toast.success('Cost code created')
+    } catch (error: any) {
+      console.error('Failed to create cost code:', error)
+      toast.error(error.message || 'Failed to create cost code')
+    }
   }
 
   const handleEdit = (code: CostCode) => {
@@ -63,34 +85,40 @@ export function CostCodesPage() {
     setIsEditOpen(true)
   }
 
-  const handleUpdate = () => {
+  const handleUpdate = async () => {
     if (!formData.code || !formData.name || !editingCode) {
       toast.error('Please fill in required fields')
       return
     }
 
-    setCostCodes(current =>
-      (current || []).map(code =>
-        code.id === editingCode.id
-          ? {
-              ...code,
-              code: formData.code,
-              name: formData.name,
-              category: formData.category,
-              budgetAmount: formData.budgetAmount ? parseFloat(formData.budgetAmount) : undefined,
-            }
-          : code
-      )
-    )
-    setIsEditOpen(false)
-    setEditingCode(null)
-    setFormData({ code: '', name: '', category: 'labor', budgetAmount: '' })
-    toast.success('Cost code updated')
+    try {
+      await costCodesDb.update(editingCode.id, {
+        code: formData.code,
+        name: formData.name,
+        category: formData.category,
+        budgetAmount: formData.budgetAmount ? parseFloat(formData.budgetAmount) : undefined,
+      })
+
+      await loadCostCodes()
+      setIsEditOpen(false)
+      setEditingCode(null)
+      setFormData({ code: '', name: '', category: 'labor', budgetAmount: '' })
+      toast.success('Cost code updated')
+    } catch (error: any) {
+      console.error('Failed to update cost code:', error)
+      toast.error(error.message || 'Failed to update cost code')
+    }
   }
 
-  const handleDelete = (codeId: string) => {
-    setCostCodes(current => (current || []).filter(c => c.id !== codeId))
-    toast.success('Cost code deleted')
+  const handleDelete = async (codeId: string) => {
+    try {
+      await costCodesDb.delete(codeId)
+      await loadCostCodes()
+      toast.success('Cost code deleted')
+    } catch (error: any) {
+      console.error('Failed to delete cost code:', error)
+      toast.error(error.message || 'Failed to delete cost code')
+    }
   }
 
   return (

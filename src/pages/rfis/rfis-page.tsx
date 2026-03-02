@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { Plus, Question, CheckCircle, Clock, Warning, PencilSimple, Trash } from '@phosphor-icons/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -11,13 +11,14 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { useKV } from '@github/spark/hooks'
 import { toast } from 'sonner'
+import { rfisDb } from '@/lib/db'
 import type { RFI } from '@/lib/types'
 
 export function RFIsPage() {
   const { projectId } = useParams()
-  const [rfis, setRfis] = useKV<RFI[]>(`rfis-${projectId}`, [])
+  const [rfis, setRfis] = useState<RFI[]>([])
+  const [loading, setLoading] = useState(true)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [editingRFI, setEditingRFI] = useState<RFI | null>(null)
@@ -30,33 +31,53 @@ export function RFIsPage() {
     status: 'open' as RFI['status'],
   })
 
-  const handleCreate = () => {
+  const loadRFIs = async () => {
+    if (!projectId) return
+    setLoading(true)
+    try {
+      const projectRFIs = await rfisDb.getByProject(projectId)
+      setRfis(projectRFIs)
+    } catch (error) {
+      console.error('Failed to load RFIs:', error)
+      toast.error('Failed to load RFIs')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadRFIs()
+  }, [projectId])
+
+  const handleCreate = async () => {
     if (!formData.number || !formData.subject || !formData.question) {
       toast.error('Please fill in required fields')
       return
     }
 
-    const newRFI: RFI = {
-      id: crypto.randomUUID(),
-      projectId: projectId!,
-      ...formData,
-      status: 'open',
-      submittedBy: 'Current User',
-      submittedDate: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
+    try {
+      await rfisDb.create({
+        projectId: projectId!,
+        ...formData,
+        submittedBy: 'Current User',
+        submittedDate: new Date().toISOString(),
+      })
+      
+      await loadRFIs()
+      setIsCreateOpen(false)
+      setFormData({
+        number: '',
+        subject: '',
+        question: '',
+        priority: 'medium',
+        dueDate: '',
+        status: 'open',
+      })
+      toast.success('RFI created successfully')
+    } catch (error: any) {
+      console.error('Failed to create RFI:', error)
+      toast.error(error.message || 'Failed to create RFI')
     }
-
-    setRfis(current => [...(current || []), newRFI])
-    setIsCreateOpen(false)
-    setFormData({
-      number: '',
-      subject: '',
-      question: '',
-      priority: 'medium',
-      dueDate: '',
-      status: 'open',
-    })
-    toast.success('RFI created successfully')
   }
 
   const handleEdit = (rfi: RFI) => {
@@ -72,35 +93,41 @@ export function RFIsPage() {
     setIsEditOpen(true)
   }
 
-  const handleUpdate = () => {
+  const handleUpdate = async () => {
     if (!formData.number || !formData.subject || !formData.question || !editingRFI) {
       toast.error('Please fill in required fields')
       return
     }
 
-    setRfis(current =>
-      (current || []).map(rfi =>
-        rfi.id === editingRFI.id
-          ? { ...rfi, ...formData }
-          : rfi
-      )
-    )
-    setIsEditOpen(false)
-    setEditingRFI(null)
-    setFormData({
-      number: '',
-      subject: '',
-      question: '',
-      priority: 'medium',
-      dueDate: '',
-      status: 'open',
-    })
-    toast.success('RFI updated successfully')
+    try {
+      await rfisDb.update(editingRFI.id, formData)
+      await loadRFIs()
+      setIsEditOpen(false)
+      setEditingRFI(null)
+      setFormData({
+        number: '',
+        subject: '',
+        question: '',
+        priority: 'medium',
+        dueDate: '',
+        status: 'open',
+      })
+      toast.success('RFI updated successfully')
+    } catch (error: any) {
+      console.error('Failed to update RFI:', error)
+      toast.error(error.message || 'Failed to update RFI')
+    }
   }
 
-  const handleDelete = (rfiId: string) => {
-    setRfis(current => (current || []).filter(rfi => rfi.id !== rfiId))
-    toast.success('RFI deleted successfully')
+  const handleDelete = async (rfiId: string) => {
+    try {
+      await rfisDb.delete(rfiId)
+      await loadRFIs()
+      toast.success('RFI deleted successfully')
+    } catch (error: any) {
+      console.error('Failed to delete RFI:', error)
+      toast.error(error.message || 'Failed to delete RFI')
+    }
   }
 
   const getStatusBadge = (status: RFI['status']) => {

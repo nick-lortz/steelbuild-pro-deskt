@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { Plus, Wrench, CheckCircle, Warning, Gear, PencilSimple, Trash } from '@phosphor-icons/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -11,14 +11,15 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { useKV } from '@github/spark/hooks'
 import { toast } from 'sonner'
+import { equipmentDb, equipmentLogsDb } from '@/lib/db'
 import type { Equipment, EquipmentLog } from '@/lib/types'
 
 export function EquipmentPage() {
   const { projectId } = useParams()
-  const [equipment, setEquipment] = useKV<Equipment[]>('equipment', [])
-  const [equipmentLogs, setEquipmentLogs] = useKV<EquipmentLog[]>(`equipment-logs-${projectId}`, [])
+  const [equipment, setEquipment] = useState<Equipment[]>([])
+  const [equipmentLogs, setEquipmentLogs] = useState<EquipmentLog[]>([])
+  const [loading, setLoading] = useState(true)
   
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
@@ -44,40 +45,65 @@ export function EquipmentPage() {
     performedBy: '',
   })
 
-  const projectEquipment = equipment?.filter(e => e.assignedProjectId === projectId) || []
+  const loadData = async () => {
+    if (!projectId) return
+    setLoading(true)
+    try {
+      const [allEquipment, allLogs] = await Promise.all([
+        equipmentDb.getAll(),
+        equipmentLogsDb.getByProject(projectId),
+      ])
+      setEquipment(allEquipment.filter(e => e.assignedProjectId === projectId))
+      setEquipmentLogs(allLogs)
+    } catch (error) {
+      console.error('Failed to load equipment data:', error)
+      toast.error('Failed to load equipment data')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadData()
+  }, [projectId])
+
+  const projectEquipment = equipment
   const availableCount = projectEquipment.filter(e => e.status === 'available').length
   const inUseCount = projectEquipment.filter(e => e.status === 'in-use').length
   const maintenanceCount = projectEquipment.filter(e => e.status === 'maintenance').length
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!formData.name || !formData.type) {
       toast.error('Please fill in required fields')
       return
     }
 
-    const newEquipment: Equipment = {
-      id: crypto.randomUUID(),
-      name: formData.name,
-      type: formData.type,
-      model: formData.model || undefined,
-      serialNumber: formData.serialNumber || undefined,
-      status: 'available',
-      location: formData.location || undefined,
-      assignedProjectId: projectId,
-      createdAt: new Date().toISOString(),
-    }
+    try {
+      await equipmentDb.create({
+        name: formData.name,
+        type: formData.type,
+        model: formData.model || undefined,
+        serialNumber: formData.serialNumber || undefined,
+        status: 'available',
+        location: formData.location || undefined,
+        assignedProjectId: projectId,
+      })
 
-    setEquipment(current => [...(current || []), newEquipment])
-    setIsCreateOpen(false)
-    setFormData({
-      name: '',
-      type: 'other',
-      model: '',
-      serialNumber: '',
-      status: 'available',
-      location: '',
-    })
-    toast.success('Equipment added')
+      await loadData()
+      setIsCreateOpen(false)
+      setFormData({
+        name: '',
+        type: 'other',
+        model: '',
+        serialNumber: '',
+        status: 'available',
+        location: '',
+      })
+      toast.success('Equipment added')
+    } catch (error: any) {
+      console.error('Failed to create equipment:', error)
+      toast.error(error.message || 'Failed to add equipment')
+    }
   }
 
   const handleEdit = (equip: Equipment) => {
@@ -93,78 +119,85 @@ export function EquipmentPage() {
     setIsEditOpen(true)
   }
 
-  const handleUpdate = () => {
+  const handleUpdate = async () => {
     if (!formData.name || !formData.type || !editingEquipment) {
       toast.error('Please fill in required fields')
       return
     }
 
-    setEquipment(current =>
-      (current || []).map(equip =>
-        equip.id === editingEquipment.id
-          ? {
-              ...equip,
-              name: formData.name,
-              type: formData.type,
-              model: formData.model || undefined,
-              serialNumber: formData.serialNumber || undefined,
-              status: formData.status,
-              location: formData.location || undefined,
-            }
-          : equip
-      )
-    )
-    setIsEditOpen(false)
-    setEditingEquipment(null)
-    setFormData({
-      name: '',
-      type: 'other',
-      model: '',
-      serialNumber: '',
-      status: 'available',
-      location: '',
-    })
-    toast.success('Equipment updated')
+    try {
+      await equipmentDb.update(editingEquipment.id, {
+        name: formData.name,
+        type: formData.type,
+        model: formData.model || undefined,
+        serialNumber: formData.serialNumber || undefined,
+        status: formData.status,
+        location: formData.location || undefined,
+      })
+
+      await loadData()
+      setIsEditOpen(false)
+      setEditingEquipment(null)
+      setFormData({
+        name: '',
+        type: 'other',
+        model: '',
+        serialNumber: '',
+        status: 'available',
+        location: '',
+      })
+      toast.success('Equipment updated')
+    } catch (error: any) {
+      console.error('Failed to update equipment:', error)
+      toast.error(error.message || 'Failed to update equipment')
+    }
   }
 
-  const handleDelete = (equipId: string) => {
-    setEquipment(current => (current || []).map(e => 
-      e.id === equipId ? { ...e, assignedProjectId: undefined } : e
-    ))
-    toast.success('Equipment removed from project')
+  const handleDelete = async (equipmentId: string) => {
+    try {
+      await equipmentDb.delete(equipmentId)
+      await loadData()
+      toast.success('Equipment deleted')
+    } catch (error: any) {
+      console.error('Failed to delete equipment:', error)
+      toast.error(error.message || 'Failed to delete equipment')
+    }
   }
 
-  const handleCreateLog = () => {
-    if (!selectedEquipmentId || !logForm.description) {
+  const handleAddLog = async () => {
+    if (!logForm.description || !logForm.performedBy || !selectedEquipmentId) {
       toast.error('Please fill in required fields')
       return
     }
 
-    const newLog: EquipmentLog = {
-      id: crypto.randomUUID(),
-      equipmentId: selectedEquipmentId,
-      projectId,
-      date: logForm.date,
-      type: logForm.type,
-      hours: logForm.hours ? parseFloat(logForm.hours) : undefined,
-      description: logForm.description,
-      cost: logForm.cost ? parseFloat(logForm.cost) : undefined,
-      performedBy: logForm.performedBy,
-      createdAt: new Date().toISOString(),
-    }
+    try {
+      await equipmentLogsDb.create({
+        equipmentId: selectedEquipmentId,
+        projectId,
+        date: logForm.date,
+        type: logForm.type,
+        hours: logForm.hours ? parseFloat(logForm.hours) : undefined,
+        description: logForm.description,
+        cost: logForm.cost ? parseFloat(logForm.cost) : undefined,
+        performedBy: logForm.performedBy,
+      })
 
-    setEquipmentLogs(current => [...(current || []), newLog])
-    setIsLogOpen(false)
-    setSelectedEquipmentId('')
-    setLogForm({
-      type: 'usage',
-      date: new Date().toISOString().split('T')[0],
-      hours: '',
-      description: '',
-      cost: '',
-      performedBy: '',
-    })
-    toast.success('Equipment log created')
+      await loadData()
+      setIsLogOpen(false)
+      setSelectedEquipmentId('')
+      setLogForm({
+        type: 'usage',
+        date: new Date().toISOString().split('T')[0],
+        hours: '',
+        description: '',
+        cost: '',
+        performedBy: '',
+      })
+      toast.success('Log added successfully')
+    } catch (error: any) {
+      console.error('Failed to add log:', error)
+      toast.error(error.message || 'Failed to add log')
+    }
   }
 
   const getStatusBadge = (status: Equipment['status']) => {
