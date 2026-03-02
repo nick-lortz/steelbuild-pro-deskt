@@ -1629,6 +1629,248 @@ async function recalculateProjectTotals(projectId) {
   };
 }
 
+async function setUserPreference(userId, key, value) {
+  const sqliteDb = getSQLiteDB();
+  const now = new Date().toISOString();
+  
+  const existing = sqliteDb.prepare(`
+    SELECT id FROM user_preferences WHERE user_id = ? AND preference_key = ?
+  `).get(userId, key);
+  
+  if (existing) {
+    sqliteDb.prepare(`
+      UPDATE user_preferences 
+      SET preference_value = ?, updated_at = ?
+      WHERE user_id = ? AND preference_key = ?
+    `).run(value, now, userId, key);
+  } else {
+    const id = uuidv4();
+    sqliteDb.prepare(`
+      INSERT INTO user_preferences (id, user_id, preference_key, preference_value, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(id, userId, key, value, now, now);
+  }
+  
+  return { success: true };
+}
+
+async function getUserPreference(userId, key) {
+  const sqliteDb = getSQLiteDB();
+  
+  const result = sqliteDb.prepare(`
+    SELECT preference_value FROM user_preferences 
+    WHERE user_id = ? AND preference_key = ?
+  `).get(userId, key);
+  
+  return { 
+    success: true, 
+    data: result ? result.preference_value : null 
+  };
+}
+
+async function getAllUserPreferences(userId) {
+  const sqliteDb = getSQLiteDB();
+  
+  const results = sqliteDb.prepare(`
+    SELECT preference_key, preference_value 
+    FROM user_preferences 
+    WHERE user_id = ?
+  `).all(userId);
+  
+  const preferences = {};
+  results.forEach(row => {
+    preferences[row.preference_key] = row.preference_value;
+  });
+  
+  return { success: true, data: preferences };
+}
+
+async function deleteUserPreference(userId, key) {
+  const sqliteDb = getSQLiteDB();
+  
+  sqliteDb.prepare(`
+    DELETE FROM user_preferences 
+    WHERE user_id = ? AND preference_key = ?
+  `).run(userId, key);
+  
+  return { success: true };
+}
+
+async function computePortfolioMarginAtRisk(projectIds) {
+  const sqliteDb = getSQLiteDB();
+  
+  if (!projectIds || projectIds.length === 0) {
+    return { success: true, data: [] };
+  }
+  
+  const placeholders = projectIds.map(() => '?').join(',');
+  const projectsData = sqliteDb.prepare(`
+    SELECT 
+      id,
+      project_number,
+      name,
+      status,
+      original_contract_value,
+      current_contract_value,
+      total_actual_cost,
+      margin_at_risk,
+      margin_percent
+    FROM projects 
+    WHERE id IN (${placeholders}) AND deleted_at IS NULL
+  `).all(...projectIds);
+  
+  const results = [];
+  
+  for (const project of projectsData) {
+    const approvedCOs = sqliteDb.prepare(`
+      SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as co_total
+      FROM change_orders 
+      WHERE project_id = ? AND status = 'approved' AND deleted_at IS NULL
+    `).get(project.id);
+    
+    const openRFIs = sqliteDb.prepare(`
+      SELECT COUNT(*) as count 
+      FROM rfis 
+      WHERE project_id = ? AND status != 'closed' AND deleted_at IS NULL
+    `).get(project.id);
+    
+    const agingRFIs = sqliteDb.prepare(`
+      SELECT COUNT(*) as count 
+      FROM rfis 
+      WHERE project_id = ? 
+        AND status != 'closed' 
+        AND deleted_at IS NULL
+        AND julianday('now') - julianday(created_at) > 3
+    `).get(project.id);
+    
+    const overBudgetCostCodes = sqliteDb.prepare(`
+      SELECT COUNT(*) as count 
+      FROM cost_codes 
+      WHERE project_id = ? 
+        AND deleted_at IS NULL
+        AND actual_amount > budget_amount
+        AND budget_amount > 0
+    `).get(project.id);
+    
+    const slippingTasks = sqliteDb.prepare(`
+      SELECT COUNT(*) as count 
+      FROM tasks 
+      WHERE project_id = ? 
+        AND status != 'completed'
+        AND baseline_end_date IS NOT NULL
+        AND end_date IS NOT NULL
+        AND deleted_at IS NULL
+        AND julianday(end_date) > julianday(baseline_end_date)
+    `).get(project.id);
+    
+    const totalRiskFlags = (agingRFIs?.count || 0) + (overBudgetCostCodes?.count || 0) + (slippingTasks?.count || 0);
+    
+    const contractValue = project.current_contract_value || 0;
+    const actualCost = project.total_actual_cost || 0;
+    const margin = contractValue - actualCost;
+    const marginPercent = contractValue > 0 ? (margin / contractValue) * 100 : 0;
+    
+    let healthStatus = 'healthy';
+    if (marginPercent < 5 || totalRiskFlags >= 3) {
+      healthStatus = 'critical';
+    } else if (marginPercent < 10 || totalRiskFlags >= 1) {
+      healthStatus = 'warning';
+    }
+    
+    results.push({
+      project_id: project.id,
+      project_number: project.project_number,
+      project_name: project.name,
+      status: project.status,
+      contract_value: contractValue,
+      actual_cost: actualCost,
+      margin: margin,
+      margin_percent: marginPercent,
+      approved_change_orders: approvedCOs?.count || 0,
+      change_order_total: approvedCOs?.co_total || 0,
+      open_rfis: openRFIs?.count || 0,
+      aging_rfis: agingRFIs?.count || 0,
+      over_budget_cost_codes: overBudgetCostCodes?.count || 0,
+      slipping_tasks: slippingTasks?.count || 0,
+      total_risk_flags: totalRiskFlags,
+      health_status: healthStatus
+    });
+  }
+  
+  results.sort((a, b) => {
+    const statusOrder = { critical: 0, warning: 1, healthy: 2 };
+    const statusDiff = statusOrder[a.health_status] - statusOrder[b.health_status];
+    if (statusDiff !== 0) return statusDiff;
+    return a.margin_percent - b.margin_percent;
+  });
+  
+  return { success: true, data: results };
+}
+
+async function updateProject(id, data) {
+  const sqliteDb = getSQLiteDB();
+  const now = new Date().toISOString();
+  
+  const existing = sqliteDb.prepare('SELECT * FROM projects WHERE id = ?').get(id);
+  if (!existing) {
+    return { success: false, error: 'Project not found' };
+  }
+  
+  const updateFields = [];
+  const values = [];
+  
+  const allowedFields = [
+    'name', 'status', 'description', 'start_date', 'end_date', 
+    'client_name', 'location', 'original_contract_value'
+  ];
+  
+  allowedFields.forEach(field => {
+    if (data[field] !== undefined) {
+      updateFields.push(`${field} = ?`);
+      values.push(data[field]);
+    }
+  });
+  
+  updateFields.push('updated_at = ?');
+  values.push(now);
+  
+  if (data.updated_by !== undefined) {
+    updateFields.push('updated_by = ?');
+    values.push(data.updated_by);
+  }
+  
+  values.push(id);
+  
+  sqliteDb.prepare(`UPDATE projects SET ${updateFields.join(', ')} WHERE id = ?`).run(...values);
+  logAudit('project', id, 'update', id, data, data.updated_by);
+  
+  if (data.original_contract_value !== undefined) {
+    await recalculateProjectBudget(id);
+  }
+  
+  return { success: true };
+}
+
+async function listProjects(options = {}) {
+  const sqliteDb = getSQLiteDB();
+  const { status, limit = 100, offset = 0 } = options;
+  
+  const query = `
+    SELECT * FROM projects 
+    WHERE deleted_at IS NULL
+    ${status ? 'AND status = ?' : ''}
+    ORDER BY created_at DESC
+    LIMIT ? OFFSET ?
+  `;
+  
+  const params = status 
+    ? [status, limit, offset]
+    : [limit, offset];
+  
+  const results = sqliteDb.prepare(query).all(...params);
+  return { success: true, data: results };
+}
+
 module.exports = {
   createRFI,
   listRFIs,
@@ -1677,4 +1919,11 @@ module.exports = {
   recalculateProjectTotals,
   getProjectFinancialSummary,
   updateProjectContractValue,
+  setUserPreference,
+  getUserPreference,
+  getAllUserPreferences,
+  deleteUserPreference,
+  computePortfolioMarginAtRisk,
+  updateProject,
+  listProjects,
 };

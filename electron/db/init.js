@@ -277,6 +277,19 @@ function createTablesIfNotExists() {
     CREATE INDEX IF NOT EXISTS idx_change_orders_project_id ON change_orders(project_id);
     CREATE INDEX IF NOT EXISTS idx_change_orders_status ON change_orders(status);
     CREATE INDEX IF NOT EXISTS idx_contracts_project_id ON contracts(project_id);
+
+    CREATE TABLE IF NOT EXISTS user_preferences (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      preference_key TEXT NOT NULL,
+      preference_value TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(user_id, preference_key)
+    );
+    
+    CREATE INDEX IF NOT EXISTS idx_user_preferences_user_id ON user_preferences(user_id);
+    CREATE INDEX IF NOT EXISTS idx_user_preferences_key ON user_preferences(user_id, preference_key);
   `);
   
   migrateSchema();

@@ -50,6 +50,13 @@ const {
   recalculateProjectTotals,
   getProjectFinancialSummary,
   updateProjectContractValue,
+  setUserPreference,
+  getUserPreference,
+  getAllUserPreferences,
+  deleteUserPreference,
+  computePortfolioMarginAtRisk,
+  updateProject,
+  listProjects,
 } = require("./db/queries");
 
 const isDev = !app.isPackaged;
@@ -841,6 +848,62 @@ ipcMain.handle("db:getProjectFinancialSummary", async (event, projectId) => {
 ipcMain.handle("db:updateProjectContractValue", async (event, projectId, originalValue) => {
   try {
     return await updateProjectContractValue(projectId, originalValue);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:setUserPreference", async (event, userId, key, value) => {
+  try {
+    return await setUserPreference(userId, key, value);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:getUserPreference", async (event, userId, key) => {
+  try {
+    return await getUserPreference(userId, key);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:getAllUserPreferences", async (event, userId) => {
+  try {
+    return await getAllUserPreferences(userId);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:deleteUserPreference", async (event, userId, key) => {
+  try {
+    return await deleteUserPreference(userId, key);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:computePortfolioMarginAtRisk", async (event, projectIds) => {
+  try {
+    return await computePortfolioMarginAtRisk(projectIds);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:updateProject", async (event, id, data) => {
+  try {
+    return await updateProject(id, data);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:listProjects", async (event, options) => {
+  try {
+    return await listProjects(options);
   } catch (error) {
     return { success: false, error: error.message };
   }

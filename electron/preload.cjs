@@ -121,6 +121,13 @@ contextBridge.exposeInMainWorld("SBP", {
     recalculateProjectTotals: (projectId) => ipcRenderer.invoke("db:recalculateProjectTotals", projectId),
     getProjectFinancialSummary: (projectId) => ipcRenderer.invoke("db:getProjectFinancialSummary", projectId),
     updateProjectContractValue: (projectId, originalValue) => ipcRenderer.invoke("db:updateProjectContractValue", projectId, originalValue),
+    setUserPreference: (userId, key, value) => ipcRenderer.invoke("db:setUserPreference", userId, key, value),
+    getUserPreference: (userId, key) => ipcRenderer.invoke("db:getUserPreference", userId, key),
+    getAllUserPreferences: (userId) => ipcRenderer.invoke("db:getAllUserPreferences", userId),
+    deleteUserPreference: (userId, key) => ipcRenderer.invoke("db:deleteUserPreference", userId, key),
+    computePortfolioMarginAtRisk: (projectIds) => ipcRenderer.invoke("db:computePortfolioMarginAtRisk", projectIds),
+    updateProject: (id, data) => ipcRenderer.invoke("db:updateProject", id, data),
+    listProjects: (options) => ipcRenderer.invoke("db:listProjects", options),
   },
   file: {
     uploadDrawing: (fileData) => ipcRenderer.invoke("file:uploadDrawing", fileData),

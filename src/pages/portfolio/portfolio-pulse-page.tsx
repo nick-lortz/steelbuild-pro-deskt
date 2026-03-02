@@ -20,6 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useKV } from '@github/spark/hooks'
+import { useDatabase } from '@/hooks/use-database'
 import {
   BarChart,
   Bar,
@@ -53,17 +54,27 @@ interface PortfolioMetrics {
 }
 
 interface ProjectHealth {
-  project: Project
-  scheduleHealth: number
-  budgetHealth: number
-  rfiCount: number
-  overdueTasks: number
-  risks: number
-  status: 'healthy' | 'warning' | 'critical'
+  project_id: string
+  project_number: string
+  project_name: string
+  status: string
+  contract_value: number
+  actual_cost: number
+  margin: number
+  margin_percent: number
+  approved_change_orders: number
+  change_order_total: number
+  open_rfis: number
+  aging_rfis: number
+  over_budget_cost_codes: number
+  slipping_tasks: number
+  total_risk_flags: number
+  health_status: 'healthy' | 'warning' | 'critical'
 }
 
 export function PortfolioPulsePage() {
   const navigate = useNavigate()
+  const { isDesktop, db } = useDatabase()
   const [projects] = useKV<Project[]>('projects', [])
   const [metrics, setMetrics] = useState<PortfolioMetrics | null>(null)
   const [projectHealthData, setProjectHealthData] = useState<ProjectHealth[]>([])
@@ -78,96 +89,62 @@ export function PortfolioPulsePage() {
         return
       }
 
-      const activeProjects = projects.filter(p => p.status === 'active')
-      let totalBudget = 0
-      let totalSpent = 0
-      let onScheduleCount = 0
-      let underBudgetCount = 0
-      let atRiskCount = 0
-      let totalRiskCount = 0
-      let highRiskCount = 0
-
-      const healthData: ProjectHealth[] = []
-
-      for (const project of projects) {
-        const budgets = await spark.kv.get<Budget[]>(`budgets-${project.id}`) || []
-        const tasks = await spark.kv.get<Task[]>(`tasks-${project.id}`) || []
-        const rfis = await spark.kv.get<RFI[]>(`rfis-${project.id}`) || []
-        const risks = await spark.kv.get<ProjectRisk[]>(`risks-${project.id}`) || []
-
-        const projectBudget = budgets.reduce((sum, b) => sum + b.budgetedAmount, 0)
-        const projectSpent = budgets.reduce((sum, b) => sum + b.actualAmount, 0)
-        totalBudget += projectBudget
-        totalSpent += projectSpent
-
-        const completedTasks = tasks.filter(t => t.status === 'completed').length
-        const scheduleHealth = tasks.length > 0 ? (completedTasks / tasks.length) * 100 : 0
-        const budgetHealth = projectBudget > 0 ? ((projectBudget - projectSpent) / projectBudget) * 100 : 0
-        const overdueTasks = tasks.filter(t => 
-          t.status !== 'completed' && new Date(t.endDate) < new Date()
-        ).length
-
-        if (scheduleHealth >= 80) onScheduleCount++
-        if (budgetHealth >= 0) underBudgetCount++
-
-        const projectRiskCount = risks.length
-        const projectHighRisks = risks.filter(r => 
-          r.probability === 'high' || r.impact === 'high'
-        ).length
-
-        totalRiskCount += projectRiskCount
-        highRiskCount += projectHighRisks
-
-        const status: 'healthy' | 'warning' | 'critical' = 
-          budgetHealth < -10 || scheduleHealth < 50 || projectHighRisks > 3 ? 'critical' :
-          budgetHealth < 0 || scheduleHealth < 80 || projectHighRisks > 0 ? 'warning' :
-          'healthy'
-
-        if (status === 'critical' || status === 'warning') atRiskCount++
-
-        if (project.status === 'active' || project.status === 'planning') {
-          healthData.push({
-            project,
-            scheduleHealth,
-            budgetHealth,
-            rfiCount: rfis.filter(r => r.status === 'open' || r.status === 'escalated').length,
-            overdueTasks,
-            risks: projectRiskCount,
-            status,
+      if (isDesktop && projects.length > 0) {
+        const projectIds = projects.map(p => p.id)
+        const result = await db.computePortfolioMarginAtRisk(projectIds)
+        
+        if (result.success && result.data) {
+          setProjectHealthData(result.data)
+          
+          const activeProjects = result.data.filter(p => p.status === 'active')
+          const totalValue = result.data.reduce((sum, p) => sum + p.contract_value, 0)
+          const totalSpent = result.data.reduce((sum, p) => sum + p.actual_cost, 0)
+          const atRiskProjects = result.data.filter(p => p.health_status === 'critical' || p.health_status === 'warning').length
+          const onScheduleProjects = result.data.filter(p => p.slipping_tasks === 0).length
+          const underBudgetProjects = result.data.filter(p => p.over_budget_cost_codes === 0).length
+          const totalRiskFlags = result.data.reduce((sum, p) => sum + p.total_risk_flags, 0)
+          const highRisks = result.data.filter(p => p.health_status === 'critical').length
+          
+          setMetrics({
+            totalProjects: projects.length,
+            activeProjects: activeProjects.length,
+            totalValue,
+            atRiskProjects,
+            onScheduleProjects,
+            underBudgetProjects,
+            totalBudget: totalValue,
+            totalSpent,
+            utilizationRate: (activeProjects.length / Math.max(projects.length, 1)) * 100,
+            avgScheduleHealth: result.data.length > 0 
+              ? result.data.reduce((sum, p) => sum + (100 - (p.slipping_tasks * 10)), 0) / result.data.length
+              : 0,
+            totalRisks: totalRiskFlags,
+            highRisks,
           })
         }
+      } else {
+        setMetrics({
+          totalProjects: projects.length,
+          activeProjects: projects.filter(p => p.status === 'active').length,
+          totalValue: projects.reduce((sum, p) => sum + (p.contractValue || 0), 0),
+          atRiskProjects: 0,
+          onScheduleProjects: 0,
+          underBudgetProjects: 0,
+          totalBudget: 0,
+          totalSpent: 0,
+          utilizationRate: 0,
+          avgScheduleHealth: 0,
+          totalRisks: 0,
+          highRisks: 0,
+        })
+        setProjectHealthData([])
       }
 
-      healthData.sort((a, b) => {
-        const statusOrder = { critical: 0, warning: 1, healthy: 2 }
-        return statusOrder[a.status] - statusOrder[b.status]
-      })
-
-      const utilizationRate = projects.filter(p => p.status === 'active').length / Math.max(projects.length, 1) * 100
-      const avgScheduleHealth = healthData.length > 0 
-        ? healthData.reduce((sum, h) => sum + h.scheduleHealth, 0) / healthData.length 
-        : 0
-
-      setMetrics({
-        totalProjects: projects.length,
-        activeProjects: activeProjects.length,
-        totalValue: projects.reduce((sum, p) => sum + (p.contractValue || 0), 0),
-        atRiskProjects: atRiskCount,
-        onScheduleProjects: onScheduleCount,
-        underBudgetProjects: underBudgetCount,
-        totalBudget,
-        totalSpent,
-        utilizationRate,
-        avgScheduleHealth,
-        totalRisks: totalRiskCount,
-        highRisks: highRiskCount,
-      })
-      setProjectHealthData(healthData)
       setLoading(false)
     }
 
     calculatePortfolioMetrics()
-  }, [projects])
+  }, [projects, isDesktop, db])
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -178,7 +155,7 @@ export function PortfolioPulsePage() {
     }).format(value)
   }
 
-  const getStatusBadge = (status: ProjectHealth['status']) => {
+  const getStatusBadge = (status: ProjectHealth['health_status']) => {
     const config = {
       healthy: { variant: 'default' as const, label: 'Healthy', icon: <CheckCircle size={14} /> },
       warning: { variant: 'secondary' as const, label: 'Warning', icon: <Warning size={14} /> },
@@ -195,14 +172,14 @@ export function PortfolioPulsePage() {
   ].filter(item => item.value > 0) : []
 
   const filteredHealthData = projectHealthData.filter(h => {
-    if (statusFilter !== 'all' && h.project.status !== statusFilter) return false
-    if (healthFilter !== 'all' && h.status !== healthFilter) return false
+    if (statusFilter !== 'all' && h.status !== statusFilter) return false
+    if (healthFilter !== 'all' && h.health_status !== healthFilter) return false
     return true
   })
 
   const budgetPerformance = filteredHealthData.map(h => ({
-    name: h.project.name.substring(0, 15),
-    health: Math.round(h.budgetHealth),
+    name: h.project_name.substring(0, 15),
+    health: Math.round(h.margin_percent),
   }))
 
   if (loading) {

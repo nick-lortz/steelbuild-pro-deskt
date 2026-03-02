@@ -43,6 +43,13 @@ const fallbackDB = {
   listDrawingSheets: async () => ({ success: false, data: [] }),
   updateDrawingSheetStatus: async () => ({ success: false, error: 'Not running in desktop mode' }),
   deleteDrawingSheet: async () => ({ success: false, error: 'Not running in desktop mode' }),
+  setUserPreference: async () => ({ success: false, error: 'Not running in desktop mode' }),
+  getUserPreference: async () => ({ success: false, data: null }),
+  getAllUserPreferences: async () => ({ success: false, data: {} }),
+  deleteUserPreference: async () => ({ success: false, error: 'Not running in desktop mode' }),
+  computePortfolioMarginAtRisk: async () => ({ success: false, data: [] }),
+  updateProject: async () => ({ success: false, error: 'Not running in desktop mode' }),
+  listProjects: async () => ({ success: false, data: [] }),
 };
 
 export function useDatabase() {
