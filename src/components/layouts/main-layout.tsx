@@ -13,17 +13,17 @@ export function MainLayout() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 w-full border-b bg-card/80 backdrop-blur-xl supports-[backdrop-filter]:bg-card/60 shadow-sm">
+      <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-card/95 backdrop-blur-xl supports-[backdrop-filter]:bg-card/80" style={{ boxShadow: 'var(--shadow-sm)' }}>
         <div className="container flex h-16 items-center justify-between px-6">
           <div className="flex items-center gap-8">
             <Link to="/" className="flex items-center gap-3 group">
               <div className="relative">
-                <Buildings size={36} weight="duotone" className="text-primary transition-transform group-hover:scale-105" />
-                <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+                <Buildings size={36} weight="duotone" className="text-primary transition-all duration-200 group-hover:scale-110 group-hover:text-accent" />
+                <div className="absolute inset-0 bg-primary/20 blur-lg rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               </div>
               <div>
-                <h1 className="text-xl font-bold leading-none tracking-tight">SteelBuild Pro</h1>
-                <p className="text-xs text-muted-foreground font-medium">Construction Management</p>
+                <h1 className="text-xl font-bold leading-none tracking-tight bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">SteelBuild Pro</h1>
+                <p className="text-xs text-muted-foreground font-medium tracking-wide">Construction Management</p>
               </div>
             </Link>
             

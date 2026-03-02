@@ -166,22 +166,25 @@ This is a multi-module construction ERP system with project hierarchies, cost tr
 
 ## Design Direction
 
-Industrial strength meets modern precision. The design should feel like professional-grade engineering software - not flashy, but confident, detailed, and built for serious work. Think CAD software meets construction site ruggedness. Strong visual hierarchy, clear data tables, and purposeful use of construction industry color language (steel blue, safety orange accents, concrete neutrals).
+Industrial strength meets modern precision with enterprise polish. The design conveys professional-grade engineering software built for serious work, with sophisticated aesthetics that inspire confidence. Strong visual hierarchy, refined interactions, and purposeful use of construction industry color language create a distinctive, memorable experience that feels both powerful and approachable.
 
 ## Color Selection
 
-The palette draws from the steel construction environment: industrial blues for trust and structure, concrete grays for neutrality, and safety orange for critical actions.
+The palette draws from the steel construction environment with refined sophistication: steel blue for precision and trust, safety orange for critical actions, and a subtle off-white background that reduces eye strain during extended use.
 
-- **Primary Color**: Steel Blue `oklch(0.45 0.10 250)` - Communicates reliability, precision, industrial engineering
+- **Primary Color**: Steel Blue `oklch(0.45 0.12 250)` - Communicates reliability, precision, industrial engineering strength. Enhanced saturation for better visual impact.
 - **Secondary Colors**: 
-  - Concrete Gray `oklch(0.65 0.02 270)` - Backgrounds, supporting UI
-  - Slate `oklch(0.35 0.03 260)` - Text, borders, structure
-- **Accent Color**: Safety Orange `oklch(0.68 0.18 45)` - CTAs, warnings, important status indicators
+  - Refined Gray `oklch(0.93 0.008 250)` - Backgrounds, supporting UI with blue undertone for cohesion
+  - Slate `oklch(0.50 0.010 250)` - Muted text, secondary elements
+- **Accent Color**: Safety Orange `oklch(0.68 0.18 45)` - CTAs, warnings, important status indicators with high visibility
+- **Success Color**: Industrial Green `oklch(0.65 0.18 150)` - Positive indicators, completed states, on-track status
+- **Warning Color**: Amber Yellow `oklch(0.75 0.15 80)` - Caution states, pending items, approaching thresholds
 - **Foreground/Background Pairings**:
-  - Primary (Steel Blue): White text `oklch(0.98 0 0)` - Ratio 7.2:1 ✓
-  - Secondary (Concrete Gray): Dark Slate text `oklch(0.25 0.03 260)` - Ratio 6.1:1 ✓
-  - Accent (Safety Orange): White text `oklch(0.98 0 0)` - Ratio 5.3:1 ✓
-  - Background (Light Gray): Foreground Slate `oklch(0.25 0.03 260)` - Ratio 12.1:1 ✓
+  - Primary (Steel Blue): White text `oklch(0.99 0 0)` - Ratio 7.2:1 ✓
+  - Secondary (Refined Gray): Dark Slate text `oklch(0.20 0.015 250)` - Ratio 8.1:1 ✓
+  - Accent (Safety Orange): White text `oklch(0.99 0 0)` - Ratio 5.3:1 ✓
+  - Background (Off-White): Foreground Slate `oklch(0.15 0.015 250)` - Ratio 14.2:1 ✓
+  - Success (Industrial Green): White text `oklch(0.99 0 0)` - Ratio 5.8:1 ✓
 
 ## Font Selection
 
@@ -297,12 +300,14 @@ All financial metrics auto-update when underlying data changes:
 
 ## Animations
 
-Animations should enhance clarity and provide feedback without slowing down power users. Fast, purposeful, spring-based physics for drawer/modal entry. Subtle hover states on interactive elements. Loading skeletons for data fetches.
+Animations enhance clarity and provide professional feedback without slowing down power users. Spring-based physics for natural motion, subtle hover states with smooth transitions, and purposeful loading states create a polished, responsive feel.
 
-- **Entry/Exit**: 250ms spring for dialogs and sheets (not linear easing - use spring physics)
-- **Hover States**: 120ms ease-out for button/row hovers
-- **Data Loading**: Skeleton pulses at 1.5s intervals
-- **Success Feedback**: 200ms scale bounce on save confirmation
+- **Entry/Exit**: 300ms spring-eased animations for dialogs and sheets with subtle translateY for depth
+- **Hover States**: 200ms transitions for button/row hovers with shadow elevation changes
+- **Data Loading**: Custom spinner with primary color, centered with descriptive text
+- **Success Feedback**: Smooth transitions on state changes, toast notifications for confirmations
+- **Card Interactions**: Combined hover effects - scale (1.02), shadow (md → lg), border color shifts
+- **Page Transitions**: Fade-in with translateY(8px) animation on page load for smooth entry
 
 ## Component Selection
 
@@ -322,9 +327,10 @@ Animations should enhance clarity and provide feedback without slowing down powe
 - Cost summary cards with sparkline charts (using recharts)
 
 **States**:
-- Buttons: default / hover (lighter) / active (darker) / disabled (muted + no pointer)
-- Inputs: default / focus (ring) / error (destructive border) / disabled (muted)
-- Rows: default / hover (light bg) / selected (accent bg)
+- Buttons: default (shadow-sm) / hover (shadow-md + color shift) / active (pressed) / disabled (muted opacity + no pointer) / focus (ring)
+- Inputs: default (border-input) / focus (ring + border shift) / error (destructive border) / disabled (muted)
+- Rows: default / hover (light bg + border shift) / selected (accent bg)
+- Cards: default / hover (shadow elevation + scale + border color shift)
 
 **Icon Selection**:
 - Projects: Buildings, Folders (Phosphor Icons)
@@ -337,11 +343,12 @@ Animations should enhance clarity and provide feedback without slowing down powe
 - PMA: Robot, ChatCircle
 
 **Spacing**:
-- Container padding: 6 (24px)
-- Card padding: 4-6 (16-24px)
-- Form field gaps: 4 (16px)
-- Section gaps: 8 (32px)
-- Table cell padding: 3 (12px)
+- Container padding: 6-8 (24-32px) with larger spacing for main content areas
+- Card padding: 6 (24px) for headers, balanced content padding
+- Form field gaps: 4-5 (16-20px) for comfortable vertical rhythm
+- Section gaps: 8 (32px) for clear content separation
+- Table cell padding: 3-4 (12-16px) for data density
+- Grid gaps: 5 (20px) for balanced card layouts
 
 **Mobile**:
 - Sidebar collapses to drawer (Sheet component)
