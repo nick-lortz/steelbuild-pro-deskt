@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/select'
 import { toast } from 'sonner'
 import { projectsDb } from '@/lib/db'
+import { businessRules, BusinessRuleError } from '@/lib/business-rules'
 import type { Project } from '@/lib/types'
 
 interface ProjectFormDialogProps {
@@ -53,6 +54,11 @@ export function ProjectFormDialog({
   const onSubmit = async (data: any) => {
     setLoading(true)
     try {
+      await businessRules.uniqueness.validateProjectNumber(
+        data.number,
+        project?.id
+      )
+
       if (project) {
         await projectsDb.update(project.id, data)
         toast.success('Project updated successfully')
@@ -62,7 +68,11 @@ export function ProjectFormDialog({
       }
       onSuccess()
     } catch (error) {
-      toast.error('Failed to save project')
+      if (error instanceof BusinessRuleError) {
+        toast.error(error.message)
+      } else {
+        toast.error('Failed to save project')
+      }
       console.error(error)
     } finally {
       setLoading(false)
