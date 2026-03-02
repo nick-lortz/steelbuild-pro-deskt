@@ -1,120 +1,207 @@
 import { projectsDb } from '../db'
 
-export async function checkDataIntegrity(projectId?: string): Promise<{
-  passed: boolean
-  issues: Array<{
-    entity: string
-    id: string
-    issue: string
-    severity: 'low' | 'medium' | 'high'
-    autoFixable: boolean
-  }>
-  summary: string
-}> {
-  const issues: Array<{
-    entity: string
-    id: string
-    issue: string
-    severity: 'low' | 'medium' | 'high'
-    autoFixable: boolean
-  }> = []
+export interface IntegrityFinding {
+  id: string
+  entityType: string
+  entityId: string
+  title: string
+  description: string
+  severity: 'critical' | 'high' | 'medium' | 'low'
+  autoFixable: boolean
+  createdAt: string
+}
 
-  const projects = await projectsDb.getAll()
-  const targetProjects = projectId
-    ? projects.filter((p) => p.id === projectId)
-    : projects
+interface DataIntegrityParams {
+  projects: any[]
+  rfis: any[]
+  tasks: any[]
+  budgets: any[]
+  costCodes: any[]
+  sovItems: any[]
+}
+
+export async function checkDataIntegrity(params: DataIntegrityParams): Promise<IntegrityFinding[]> {
+  const findings: IntegrityFinding[] = []
+  const { projects, rfis, tasks, budgets, costCodes, sovItems } = params
 
   const projectNumbers = new Set()
-  for (const project of targetProjects) {
+  for (const project of projects) {
     if (projectNumbers.has(project.number)) {
-      issues.push({
-        entity: 'Project',
-        id: project.id,
-        issue: `Duplicate project number: ${project.number}`,
-        severity: 'high',
+      findings.push({
+        id: crypto.randomUUID(),
+        entityType: 'Project',
+        entityId: project.id,
+        title: 'Duplicate Project Number',
+        description: `Project number ${project.number} is used by multiple projects`,
+        severity: 'critical',
         autoFixable: false,
+        createdAt: new Date().toISOString(),
       })
     }
     projectNumbers.add(project.number)
 
     if (project.contractValue < 0) {
-      issues.push({
-        entity: 'Project',
-        id: project.id,
-        issue: 'Contract value is negative',
+      findings.push({
+        id: crypto.randomUUID(),
+        entityType: 'Project',
+        entityId: project.id,
+        title: 'Negative Contract Value',
+        description: `Project ${project.name} has a negative contract value`,
         severity: 'medium',
         autoFixable: true,
+        createdAt: new Date().toISOString(),
+      })
+    }
+
+    if (!project.startDate) {
+      findings.push({
+        id: crypto.randomUUID(),
+        entityType: 'Project',
+        entityId: project.id,
+        title: 'Missing Start Date',
+        description: `Project ${project.name} is missing a start date`,
+        severity: 'low',
+        autoFixable: false,
+        createdAt: new Date().toISOString(),
       })
     }
   }
 
-  const rfis = await spark.kv.get<any[]>('rfis')
-  if (rfis) {
-    const rfiMap = new Map<string, Set<string>>()
-    
-    for (const rfi of rfis) {
-      const key = `${rfi.projectId}-${rfi.rfiNumber}`
-      if (!rfiMap.has(rfi.projectId)) {
-        rfiMap.set(rfi.projectId, new Set())
-      }
-      if (rfiMap.get(rfi.projectId)!.has(rfi.rfiNumber)) {
-        issues.push({
-          entity: 'RFI',
-          id: rfi.id,
-          issue: `Duplicate RFI number ${rfi.rfiNumber} in project`,
-          severity: 'high',
-          autoFixable: false,
-        })
-      }
-      rfiMap.get(rfi.projectId)!.add(rfi.rfiNumber)
+  const rfiMap = new Map<string, Set<string>>()
+  for (const rfi of rfis) {
+    if (!rfiMap.has(rfi.projectId)) {
+      rfiMap.set(rfi.projectId, new Set())
+    }
+    if (rfiMap.get(rfi.projectId)!.has(rfi.number)) {
+      findings.push({
+        id: crypto.randomUUID(),
+        entityType: 'RFI',
+        entityId: rfi.id,
+        title: 'Duplicate RFI Number',
+        description: `RFI number ${rfi.number} is duplicated in project`,
+        severity: 'high',
+        autoFixable: false,
+        createdAt: new Date().toISOString(),
+      })
+    }
+    rfiMap.get(rfi.projectId)!.add(rfi.number)
 
-      if (!rfi.projectId || !targetProjects.some((p) => p.id === rfi.projectId)) {
-        issues.push({
-          entity: 'RFI',
-          id: rfi.id,
-          issue: 'RFI references non-existent project',
-          severity: 'high',
-          autoFixable: true,
-        })
+    if (!rfi.projectId || !projects.some((p) => p.id === rfi.projectId)) {
+      findings.push({
+        id: crypto.randomUUID(),
+        entityType: 'RFI',
+        entityId: rfi.id,
+        title: 'Orphaned RFI',
+        description: 'RFI references a non-existent project',
+        severity: 'high',
+        autoFixable: true,
+        createdAt: new Date().toISOString(),
+      })
+    }
+  }
+
+  for (const task of tasks) {
+    if (!task.projectId || !projects.some((p) => p.id === task.projectId)) {
+      findings.push({
+        id: crypto.randomUUID(),
+        entityType: 'Task',
+        entityId: task.id,
+        title: 'Orphaned Task',
+        description: 'Task references a non-existent project',
+        severity: 'high',
+        autoFixable: true,
+        createdAt: new Date().toISOString(),
+      })
+    }
+
+    if (task.startDate && task.endDate && task.startDate > task.endDate) {
+      findings.push({
+        id: crypto.randomUUID(),
+        entityType: 'Task',
+        entityId: task.id,
+        title: 'Invalid Date Range',
+        description: 'Task start date is after end date',
+        severity: 'medium',
+        autoFixable: true,
+        createdAt: new Date().toISOString(),
+      })
+    }
+
+    if (task.dependencies && task.dependencies.length > 0) {
+      for (const depId of task.dependencies) {
+        if (!tasks.some((t) => t.id === depId)) {
+          findings.push({
+            id: crypto.randomUUID(),
+            entityType: 'Task',
+            entityId: task.id,
+            title: 'Broken Task Dependency',
+            description: 'Task has dependency on non-existent task',
+            severity: 'high',
+            autoFixable: true,
+            createdAt: new Date().toISOString(),
+          })
+        }
       }
     }
   }
 
-  const tasks = await spark.kv.get<any[]>('tasks')
-  if (tasks) {
-    for (const task of tasks) {
-      if (!task.projectId || !projects.some((p) => p.id === task.projectId)) {
-        issues.push({
-          entity: 'Task',
-          id: task.id,
-          issue: 'Task references non-existent project',
-          severity: 'high',
-          autoFixable: true,
-        })
-      }
+  for (const budget of budgets) {
+    if (!budget.projectId || !projects.some((p) => p.id === budget.projectId)) {
+      findings.push({
+        id: crypto.randomUUID(),
+        entityType: 'Budget',
+        entityId: budget.id,
+        title: 'Orphaned Budget',
+        description: 'Budget references a non-existent project',
+        severity: 'high',
+        autoFixable: true,
+        createdAt: new Date().toISOString(),
+      })
+    }
 
-      if (task.startDate && task.dueDate && task.startDate > task.dueDate) {
-        issues.push({
-          entity: 'Task',
-          id: task.id,
-          issue: 'Start date is after due date',
-          severity: 'medium',
-          autoFixable: true,
-        })
-      }
+    if (budget.costCodeId && !costCodes.some((c) => c.id === budget.costCodeId)) {
+      findings.push({
+        id: crypto.randomUUID(),
+        entityType: 'Budget',
+        entityId: budget.id,
+        title: 'Invalid Cost Code Reference',
+        description: 'Budget references a non-existent cost code',
+        severity: 'medium',
+        autoFixable: false,
+        createdAt: new Date().toISOString(),
+      })
     }
   }
 
-  const passed = issues.filter((i) => i.severity === 'high').length === 0
-  const summary = `Found ${issues.length} issue(s). ${
-    issues.filter((i) => i.autoFixable).length
-  } can be auto-fixed.`
+  for (const sovItem of sovItems) {
+    if (!sovItem.projectId || !projects.some((p) => p.id === sovItem.projectId)) {
+      findings.push({
+        id: crypto.randomUUID(),
+        entityType: 'SOV',
+        entityId: sovItem.id,
+        title: 'Orphaned SOV Item',
+        description: 'SOV item references a non-existent project',
+        severity: 'high',
+        autoFixable: true,
+        createdAt: new Date().toISOString(),
+      })
+    }
 
-  return {
-    passed,
-    issues,
-    summary,
+    if (sovItem.percentComplete < 0 || sovItem.percentComplete > 100) {
+      findings.push({
+        id: crypto.randomUUID(),
+        entityType: 'SOV',
+        entityId: sovItem.id,
+        title: 'Invalid Percent Complete',
+        description: `SOV item has invalid percent complete: ${sovItem.percentComplete}%`,
+        severity: 'low',
+        autoFixable: true,
+        createdAt: new Date().toISOString(),
+      })
+    }
   }
+
+  return findings
 }
 
 export async function applyAutoFix(issueEntity: string, issueId: string, issueType: string): Promise<{

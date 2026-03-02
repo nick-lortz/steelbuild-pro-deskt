@@ -632,7 +632,7 @@ export interface Submittal {
   description?: string
   specSection: string
   type: 'shop-drawing' | 'product-data' | 'sample' | 'design-data' | 'test-report' | 'other'
-  status: 'draft' | 'submitted' | 'returned' | 'approved' | 'rejected' | 'approved-as-noted'
+  status: 'draft' | 'IFA' | 'BFA' | 'OFS' | 'BFS' | 'FFF' | 'submitted' | 'returned' | 'approved' | 'rejected' | 'approved-as-noted'
   priority: 'low' | 'medium' | 'high' | 'critical'
   submittedTo: string
   submittedBy?: string
@@ -645,6 +645,7 @@ export interface Submittal {
   daysOutstanding: number
   relatedDrawings: string[]
   relatedCostCodes: string[]
+  revisionNumber?: number
   createdAt: string
   updatedAt: string
 }

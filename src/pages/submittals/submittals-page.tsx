@@ -116,9 +116,16 @@ export function SubmittalsPage() {
     switch (status) {
       case 'approved':
       case 'approved-as-noted':
+      case 'FFF':
         return 'bg-green-100 text-green-800'
       case 'rejected':
         return 'bg-red-100 text-red-800'
+      case 'IFA':
+      case 'BFA':
+        return 'bg-purple-100 text-purple-800'
+      case 'OFS':
+      case 'BFS':
+        return 'bg-cyan-100 text-cyan-800'
       case 'submitted':
         return 'bg-blue-100 text-blue-800'
       case 'returned':
@@ -237,8 +244,13 @@ export function SubmittalsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="draft">Draft</SelectItem>
+                      <SelectItem value="IFA">IFA - Issued for Approval</SelectItem>
+                      <SelectItem value="BFA">BFA - Bulletined for Approval</SelectItem>
+                      <SelectItem value="OFS">OFS - Okay for Submission</SelectItem>
+                      <SelectItem value="BFS">BFS - Bulletined for Submission</SelectItem>
+                      <SelectItem value="FFF">FFF - For Fabrication & Field</SelectItem>
                       <SelectItem value="submitted">Submitted</SelectItem>
-                      <SelectItem value="returned">Returned</SelectItem>
+                      <SelectItem value="returned">Returned for Resubmission</SelectItem>
                       <SelectItem value="approved">Approved</SelectItem>
                       <SelectItem value="rejected">Rejected</SelectItem>
                       <SelectItem value="approved-as-noted">Approved as Noted</SelectItem>
@@ -368,6 +380,11 @@ export function SubmittalsPage() {
               <SelectContent>
                 <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="draft">Draft</SelectItem>
+                <SelectItem value="IFA">IFA</SelectItem>
+                <SelectItem value="BFA">BFA</SelectItem>
+                <SelectItem value="OFS">OFS</SelectItem>
+                <SelectItem value="BFS">BFS</SelectItem>
+                <SelectItem value="FFF">FFF</SelectItem>
                 <SelectItem value="submitted">Submitted</SelectItem>
                 <SelectItem value="returned">Returned</SelectItem>
                 <SelectItem value="approved">Approved</SelectItem>
