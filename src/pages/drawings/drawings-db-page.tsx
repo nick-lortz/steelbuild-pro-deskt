@@ -1,16 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   Plus,
   Stack,
   FileText,
-  Bell,
   Upload,
   Check,
   X,
-  DownloadSimple,
-  Trash,
-  FolderOpen,
 } from '@phosphor-icons/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -21,47 +17,61 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useDrawingSets, useNotifications, useDrawingSheets } from '@/hooks/use-drawings'
-import { FileUploadWithProgress } from '@/components/shared/FileUpload'
-import { DrawingSheetViewer } from '@/components/shared/DrawingSheetViewer'
+import { useKV } from '@github/spark/hooks'
 import { toast } from 'sonner'
-import type { DrawingSet, DrawingSheet } from '@/types/electron'
 
-const STATUS_SEQUENCE: Array<DrawingSet['status']> = ['IFA', 'BFA', 'OFS', 'BFS', 'FFF'];
+type DrawingSetStatus = 'IFA' | 'BFA' | 'OFS' | 'BFS' | 'FFF'
 
-const STATUS_LABELS = {
+interface DrawingSet {
+  id: string
+  project_id: string
+  name: string
+  status: DrawingSetStatus
+  discipline?: string
+  set_number?: string
+  created_at: string
+}
+
+interface DrawingSheet {
+  id: string
+  set_id: string
+  sheet_no: string
+  title: string
+  status: DrawingSetStatus
+  created_at: string
+}
+
+const STATUS_SEQUENCE: DrawingSetStatus[] = ['IFA', 'BFA', 'OFS', 'BFS', 'FFF'];
+
+const STATUS_LABELS: Record<DrawingSetStatus, string> = {
   'IFA': 'Issued for Approval',
   'BFA': 'Back from Approval',
   'OFS': 'Out for Signature',
   'BFS': 'Back from Signature',
   'FFF': 'Fully Approved for Fabrication',
-};
+}
 
-const STATUS_COLORS: Record<DrawingSet['status'], 'default' | 'secondary' | 'outline' | 'destructive'> = {
+const STATUS_COLORS: Record<DrawingSetStatus, 'default' | 'secondary' | 'outline' | 'destructive'> = {
   'IFA': 'outline',
   'BFA': 'secondary',
   'OFS': 'default',
   'BFS': 'secondary',
   'FFF': 'default',
-};
+}
 
 export function DrawingsDBPage() {
   const { projectId } = useParams()
-  const { drawingSets, loading, createDrawingSet, updateDrawingSetStatus, deleteDrawingSet } = useDrawingSets(projectId)
-  const { notifications, markAsRead } = useNotifications(projectId)
+  const [drawingSets, setDrawingSets] = useKV<DrawingSet[]>(`drawing-sets-${projectId}`, [])
+  const [drawingSheets, setDrawingSheets] = useKV<DrawingSheet[]>(`drawing-sheets-${projectId}`, [])
   
   const [isCreateSetOpen, setIsCreateSetOpen] = useState(false)
   const [isAddSheetOpen, setIsAddSheetOpen] = useState(false)
   const [selectedSet, setSelectedSet] = useState<DrawingSet | null>(null)
   const [viewSheetsSetId, setViewSheetsSetId] = useState<string | null>(null)
-  const { drawingSheets, loading: sheetsLoading, deleteDrawingSheet } = useDrawingSheets(viewSheetsSetId || undefined)
-  const [uploadingFile, setUploadingFile] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState(0)
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
 
   const [setFormData, setSetFormData] = useState({
     name: '',
-    status: 'IFA' as DrawingSet['status'],
+    status: 'IFA' as DrawingSetStatus,
     discipline: '',
     set_number: '',
   })
@@ -69,108 +79,70 @@ export function DrawingsDBPage() {
   const [sheetFormData, setSheetFormData] = useState({
     sheet_no: '',
     title: '',
-    status: 'IFA' as DrawingSheet['status'],
+    status: 'IFA' as DrawingSetStatus,
   })
 
-  const handleDeleteSheet = async (sheetId: string) => {
-    const result = await deleteDrawingSheet(sheetId)
-    if (result.success) {
-      toast.success('Sheet deleted successfully')
-    } else {
-      toast.error(result.error || 'Failed to delete sheet')
-    }
+  const handleDeleteSheet = (sheetId: string) => {
+    setDrawingSheets((current) => 
+      current.filter(sheet => sheet.id !== sheetId)
+    )
+    toast.success('Sheet deleted successfully')
   }
 
-  const handleCreateSet = async () => {
-    if (!setFormData.name) {
+  const handleCreateSet = () => {
+    if (!setFormData.name || !projectId) {
       toast.error('Please enter a set name')
       return
     }
 
-    const result = await createDrawingSet(setFormData)
-    if (result.success) {
-      setIsCreateSetOpen(false)
-      setSetFormData({
-        name: '',
-        status: 'IFA',
-        discipline: '',
-        set_number: '',
-      })
-      toast.success('Drawing set created successfully')
-    } else {
-      toast.error(result.error || 'Failed to create drawing set')
+    const newSet: DrawingSet = {
+      id: crypto.randomUUID(),
+      project_id: projectId,
+      name: setFormData.name,
+      status: setFormData.status,
+      discipline: setFormData.discipline,
+      set_number: setFormData.set_number,
+      created_at: new Date().toISOString(),
     }
+
+    setDrawingSets((current) => [...current, newSet])
+    setIsCreateSetOpen(false)
+    setSetFormData({
+      name: '',
+      status: 'IFA',
+      discipline: '',
+      set_number: '',
+    })
+    toast.success('Drawing set created successfully')
   }
 
-  const handleAddSheet = async () => {
+  const handleAddSheet = () => {
     if (!selectedSet || !sheetFormData.sheet_no || !sheetFormData.title) {
       toast.error('Please fill in required fields')
       return
     }
 
-    if (!window.SBP?.db) {
-      toast.error('Database not available')
-      return
-    }
-
-    let fileKey: string | undefined = undefined
-
-    if (selectedFile && window.SBP?.file && projectId) {
-      try {
-        setUploadingFile(true)
-        setUploadProgress(30)
-
-        const arrayBuffer = await selectedFile.arrayBuffer()
-        
-        setUploadProgress(60)
-
-        const uploadResult = await window.SBP.file.uploadDrawing({
-          fileName: selectedFile.name,
-          fileBuffer: arrayBuffer,
-          projectId,
-        })
-
-        setUploadProgress(90)
-
-        if (!uploadResult.success || !uploadResult.data) {
-          throw new Error(uploadResult.error || 'Failed to upload file')
-        }
-
-        fileKey = uploadResult.data.fileKey
-        setUploadProgress(100)
-      } catch (error) {
-        setUploadingFile(false)
-        setUploadProgress(0)
-        toast.error(error instanceof Error ? error.message : 'Failed to upload file')
-        return
-      }
-    }
-
-    const result = await window.SBP.db.createDrawingSheet({
+    const newSheet: DrawingSheet = {
+      id: crypto.randomUUID(),
       set_id: selectedSet.id,
-      ...sheetFormData,
-      file_key: fileKey,
-    })
-
-    setUploadingFile(false)
-    setUploadProgress(0)
-
-    if (result.success) {
-      setIsAddSheetOpen(false)
-      setSelectedSet(null)
-      setSelectedFile(null)
-      setSheetFormData({
-        sheet_no: '',
-        title: '',
-        status: 'IFA',
-      })
-      toast.success('Sheet added successfully')
-    } else {
-      toast.error(result.error || 'Failed to add sheet')
+      sheet_no: sheetFormData.sheet_no,
+      title: sheetFormData.title,
+      status: sheetFormData.status,
+      created_at: new Date().toISOString(),
     }
+
+    setDrawingSheets((current) => [...current, newSheet])
+    setIsAddSheetOpen(false)
+    setSelectedSet(null)
+    setSheetFormData({
+      sheet_no: '',
+      title: '',
+      status: 'IFA',
+    })
+    toast.success('Sheet added successfully')
   }
 
-  const handleStatusChange = async (setId: string, currentStatus: DrawingSet['status']) => {
+  const handleStatusChange = (setId: string, currentStatus: DrawingSetStatus) => {
     const currentIndex = STATUS_SEQUENCE.indexOf(currentStatus)
     if (currentIndex === -1 || currentIndex === STATUS_SEQUENCE.length - 1) {
       toast.error('Cannot transition status')
@@ -178,37 +150,29 @@ export function DrawingsDBPage() {
     }
 
     const nextStatus = STATUS_SEQUENCE[currentIndex + 1]
-    const result = await updateDrawingSetStatus(setId, nextStatus)
     
-    if (result.success) {
-      toast.success(`Status updated to ${STATUS_LABELS[nextStatus]}`)
-    } else {
-      toast.error(result.error || 'Failed to update status')
-    }
+    setDrawingSets((current) =>
+      current.map(set =>
+        set.id === setId ? { ...set, status: nextStatus } : set
+      )
+    )
+    
+    toast.success(`Status updated to ${STATUS_LABELS[nextStatus]}`)
   }
 
-  const handleDeleteSet = async (setId: string) => {
+  const handleDeleteSet = (setId: string) => {
     if (!confirm('Are you sure you want to delete this drawing set?')) {
       return
     }
 
-    const result = await deleteDrawingSet(setId)
-    if (result.success) {
-      toast.success('Drawing set deleted successfully')
-    } else {
-      toast.error(result.error || 'Failed to delete drawing set')
-    }
+    setDrawingSets((current) => current.filter(set => set.id !== setId))
+    setDrawingSheets((current) => current.filter(sheet => sheet.set_id !== setId))
+    toast.success('Drawing set deleted successfully')
   }
 
-  const unreadNotifications = notifications.filter(n => !n.read_at)
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-muted-foreground">Loading drawings...</div>
-      </div>
-    )
-  }
+  const filteredSheets = viewSheetsSetId 
+    ? drawingSheets.filter(sheet => sheet.set_id === viewSheetsSetId)
+    : drawingSheets
 
   return (
     <div className="space-y-6">
@@ -261,7 +225,7 @@ export function DrawingsDBPage() {
                 <Label htmlFor="status">Initial Status</Label>
                 <Select 
                   value={setFormData.status} 
-                  onValueChange={(value: DrawingSet['status']) => setSetFormData({ ...setFormData, status: value })}
+                  onValueChange={(value: DrawingSetStatus) => setSetFormData({ ...setFormData, status: value })}
                 >
                   <SelectTrigger id="status">
                     <SelectValue />
@@ -332,15 +296,15 @@ export function DrawingsDBPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Notifications</CardTitle>
-            <Bell size={20} className={unreadNotifications.length > 0 ? 'text-primary' : 'text-muted-foreground'} />
+            <CardTitle className="text-sm font-medium">Total Sheets</CardTitle>
+            <FileText size={20} className="text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {unreadNotifications.length}
+              {drawingSheets.length}
             </div>
             <p className="text-xs text-muted-foreground">
-              Unread updates
+              All sheets
             </p>
           </CardContent>
         </Card>
@@ -350,14 +314,6 @@ export function DrawingsDBPage() {
         <TabsList>
           <TabsTrigger value="sets">Drawing Sets</TabsTrigger>
           <TabsTrigger value="sheets">All Sheets</TabsTrigger>
-          <TabsTrigger value="notifications">
-            Notifications
-            {unreadNotifications.length > 0 && (
-              <Badge variant="default" className="ml-2 h-5 px-1.5 text-xs">
-                {unreadNotifications.length}
-              </Badge>
-            )}
-          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="sets" className="space-y-4">
@@ -479,11 +435,7 @@ export function DrawingsDBPage() {
                   </Select>
                 </div>
 
-                {sheetsLoading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <div className="text-muted-foreground">Loading sheets...</div>
-                  </div>
-                ) : drawingSheets.length === 0 ? (
+                {filteredSheets.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 text-center">
                     <FileText size={48} className="text-muted-foreground mb-4" />
                     <h3 className="text-lg font-semibold mb-2">No drawing sheets</h3>
@@ -492,72 +444,58 @@ export function DrawingsDBPage() {
                     </p>
                   </div>
                 ) : (
-                  <div className="grid gap-3">
-                    {drawingSheets.map((sheet) => (
-                      <DrawingSheetViewer
-                        key={sheet.id}
-                        sheet={sheet}
-                        onDelete={handleDeleteSheet}
-                      />
-                    ))}
-                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Sheet No.</TableHead>
+                        <TableHead>Title</TableHead>
+                        <TableHead>Drawing Set</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Created</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredSheets.map((sheet) => {
+                        const set = drawingSets.find(s => s.id === sheet.set_id)
+                        return (
+                          <TableRow key={sheet.id}>
+                            <TableCell className="font-mono">{sheet.sheet_no}</TableCell>
+                            <TableCell>{sheet.title}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {set?.name || 'Unknown'}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={STATUS_COLORS[sheet.status]}>
+                                {sheet.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {new Date(sheet.created_at).toLocaleDateString()}
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleDeleteSheet(sheet.id)}
+                              >
+                                <X size={14} />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
                 )}
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="notifications" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Notification Feed</CardTitle>
-              <CardDescription>Status change notifications for drawing sets and sheets</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {notifications.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <Bell size={48} className="text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No notifications</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Notifications will appear here when drawing statuses change
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {notifications.map((notification) => (
-                    <div
-                      key={notification.id}
-                      className={`flex items-start gap-3 p-3 rounded-lg border ${
-                        notification.read_at ? 'bg-muted/30' : 'bg-primary/5 border-primary/20'
-                      }`}
-                    >
-                      <Bell size={20} className={notification.read_at ? 'text-muted-foreground' : 'text-primary'} />
-                      <div className="flex-1 space-y-1">
-                        <p className="text-sm font-medium">{notification.message}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(notification.created_at).toLocaleString()}
-                        </p>
-                      </div>
-                      {!notification.read_at && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => markAsRead(notification.id)}
-                        >
-                          Mark Read
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
 
       <Dialog open={isAddSheetOpen} onOpenChange={setIsAddSheetOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Add Drawing Sheet</DialogTitle>
             <DialogDescription>
@@ -587,7 +525,7 @@ export function DrawingsDBPage() {
               <Label htmlFor="sheet-status">Initial Status</Label>
               <Select 
                 value={sheetFormData.status} 
-                onValueChange={(value: DrawingSheet['status']) => setSheetFormData({ ...sheetFormData, status: value })}
+                onValueChange={(value: DrawingSetStatus) => setSheetFormData({ ...sheetFormData, status: value })}
               >
                 <SelectTrigger id="sheet-status">
                   <SelectValue />
@@ -601,34 +539,18 @@ export function DrawingsDBPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid gap-2">
-              <Label>Upload Drawing File (Optional)</Label>
-              <FileUploadWithProgress
-                onFileSelect={setSelectedFile}
-                accept=".pdf,.dwg,.dxf,.png,.jpg,.jpeg,.tif,.tiff"
-                maxSize={50 * 1024 * 1024}
-                uploading={uploadingFile}
-                progress={uploadProgress}
-                disabled={uploadingFile}
-              />
-              <p className="text-xs text-muted-foreground">
-                Supported formats: PDF, DWG, DXF, PNG, JPG, TIFF (Max 50MB)
-              </p>
-            </div>
           </div>
           <div className="flex justify-end gap-2">
             <Button 
               variant="outline" 
               onClick={() => {
                 setIsAddSheetOpen(false)
-                setSelectedFile(null)
               }}
-              disabled={uploadingFile}
             >
               Cancel
             </Button>
-            <Button onClick={handleAddSheet} disabled={uploadingFile}>
-              {uploadingFile ? 'Uploading...' : 'Add Sheet'}
+            <Button onClick={handleAddSheet}>
+              Add Sheet
             </Button>
           </div>
         </DialogContent>
