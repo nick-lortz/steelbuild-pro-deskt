@@ -1,5 +1,5 @@
-import { ProductionNotesDashboard } from './production-notes-dashboard'
+import { WeeklyProductionNotes } from './weekly-production-notes'
 
 export function ProductionNotesPage() {
-  return <ProductionNotesDashboard />
+  return <WeeklyProductionNotes />
 }

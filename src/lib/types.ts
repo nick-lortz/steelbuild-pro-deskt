@@ -493,32 +493,36 @@ export interface DailyLog {
   id: string
   projectId: string
   date: string
-  weather: string
-  temperature?: number
-  crew: Array<{ name: string; hours: number }>
-  workPerformed: string
-  issues?: string
-  safetyNotes?: string
+  weather: 'clear' | 'cloudy' | 'rain' | 'snow' | 'wind'
+  temperature: number
+  crewCount: number
+  equipmentUsed?: string[]
   visitors?: string[]
-  deliveries?: string[]
+  workPerformed: string
+  materialsDelivered?: string
+  delaysOrIssues?: string
+  safetyNotes?: string
   photos?: string[]
-  createdBy: string
+  submittedBy: string
   createdAt: string
+  updatedAt: string
 }
 
 export interface Meeting {
   id: string
   projectId: string
+  type: 'production' | 'safety' | 'coordination' | 'pre-install' | 'closeout' | 'other'
   title: string
-  type: 'coordination' | 'safety' | 'progress' | 'client' | 'other'
   date: string
   location?: string
-  attendees: string[]
+  attendees?: string[]
   agenda?: string
-  notes: string
+  notes?: string
   actionItems: MeetingActionItem[]
+  nextSteps?: string
   createdBy: string
   createdAt: string
+  updatedAt: string
 }
 
 export interface MeetingActionItem {
