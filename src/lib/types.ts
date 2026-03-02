@@ -689,20 +689,53 @@ export interface TodoItem {
 export interface ProductionNote {
   id: string
   projectId: string
-  date: string
-  shift?: 'day' | 'night'
-  category: 'progress' | 'issue' | 'quality' | 'safety' | 'equipment' | 'material' | 'general'
   title: string
-  content: string
-  location?: string
-  crew?: string
-  tags: string[]
-  attachments?: string[]
-  urgent: boolean
-  followUpRequired: boolean
-  followUpDate?: string
+  body: string
+  status: 'open' | 'in_progress' | 'waiting_on' | 'resolved' | 'closed'
+  priority: 'low' | 'medium' | 'high' | 'critical'
+  category: 'fab' | 'field' | 'detailing' | 'qc' | 'safety' | 'coordination' | 'delivery' | 'design_intent'
+  discipline: 'structural' | 'misc_metals' | 'stairs' | 'rails' | 'other'
+  assignee?: string
   createdBy: string
   createdAt: string
+  updatedAt: string
+  dueDate?: string
+  blocked: boolean
+  blockers: Array<{ description: string; party?: string }>
+  workPackageId?: string
+  drawingSetId?: string
+  drawingSheetId?: string
+  rfiId?: string
+  changeOrderId?: string
+  pieceMark?: string
+  tags: string[]
+  attachments: Array<{ url: string; name: string; size: number }>
+  visibility: 'internal' | 'shared_with_gc'
+  resolutionSummary?: string
+  waitingOnParty?: string
+}
+
+export interface ProductionNoteComment {
+  id: string
+  noteId: string
+  projectId: string
+  content: string
+  createdBy: string
+  createdAt: string
+  mentions: string[]
+}
+
+export interface ProductionNoteAudit {
+  id: string
+  noteId: string
+  projectId: string
+  action: 'created' | 'updated' | 'status_changed' | 'assigned' | 'commented'
+  field?: string
+  oldValue?: string
+  newValue?: string
+  performedBy: string
+  performedAt: string
+  summary: string
 }
 
 export interface Fabrication {

@@ -20,6 +20,7 @@ import {
   ChartLine,
   ListChecks,
   Robot,
+  Note,
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -200,6 +201,12 @@ export function ProjectLayout() {
             <Button variant={activeTab === 'meetings' ? 'secondary' : 'outline'} size="sm" className="gap-2">
               <UsersFour size={16} />
               Meetings
+            </Button>
+          </Link>
+          <Link to={`/projects/${projectId}/production-notes`}>
+            <Button variant={activeTab === 'production-notes' ? 'secondary' : 'outline'} size="sm" className="gap-2">
+              <Note size={16} />
+              Production Notes
             </Button>
           </Link>
         </div>
