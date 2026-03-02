@@ -10,6 +10,7 @@ import { FinancialsPage } from '@/pages/financials/financials-page'
 import { BudgetTrackingPage } from '@/pages/financials/budget-tracking-page'
 import { SOVTrackingPage } from '@/pages/financials/sov-tracking-page'
 import { ReportingAnalyticsPage } from '@/pages/financials/reporting-analytics-page'
+import { CustomReportBuilderPage } from '@/pages/financials/custom-report-builder-page'
 import { RFIsPage } from '@/pages/rfis/rfis-page'
 import { DocumentsPage } from '@/pages/documents/documents-page'
 import { DrawingsPage } from '@/pages/drawings/drawings-page'
@@ -87,6 +88,10 @@ export const router = createBrowserRouter([
           {
             path: 'reporting',
             element: <ReportingAnalyticsPage />,
+          },
+          {
+            path: 'custom-reports',
+            element: <CustomReportBuilderPage />,
           },
           {
             path: 'rfis',

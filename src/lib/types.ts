@@ -579,3 +579,47 @@ export interface ReportSnapshot {
   trends: Array<{ metric: string; direction: 'up' | 'down' | 'stable'; value: number }>
   createdAt: string
 }
+
+export interface SOVVersion {
+  id: string
+  projectId: string
+  versionNumber: number
+  periodStart: string
+  periodEnd: string
+  status: 'draft' | 'submitted' | 'approved' | 'rejected'
+  notes?: string
+  submittedDate?: string
+  submittedBy?: string
+  approvedDate?: string
+  approvedBy?: string
+  createdAt: string
+}
+
+export interface SOVItem {
+  id: string
+  projectId: string
+  versionId: string
+  lineNumber: number
+  description: string
+  scheduledValue: number
+  workCompleted: number
+  materialsStored: number
+  totalCompleted: number
+  percentComplete: number
+  retainage: number
+  previouslyBilled: number
+  currentBilling: number
+  balance: number
+  costCodeId?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface SOVCostCodeMap {
+  id: string
+  projectId: string
+  costCodeId: string
+  sovLineNumber: number
+  allocatedPercent: number
+  createdAt: string
+}

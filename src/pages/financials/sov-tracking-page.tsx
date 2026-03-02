@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Plus, Download, FileText, CheckCircle, Clock, XCircle } from '@phosphor-icons/react'
+import { Plus, Download, FileText, CheckCircle, Clock, XCircle, Sparkle } from '@phosphor-icons/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -13,16 +13,22 @@ import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useKV } from '@github/spark/hooks'
 import { toast } from 'sonner'
-import type { SOVItem, SOVVersion, Budget } from '@/lib/types'
+import { generateSOVFromCostCodes } from '@/lib/functions/sov-generation'
+import type { SOVItem, SOVVersion, Budget, CostCode, Task, WorkPackage } from '@/lib/types'
 
 export function SOVTrackingPage() {
   const { projectId } = useParams()
   const [sovVersions, setSOVVersions] = useKV<SOVVersion[]>(`sov-versions-${projectId}`, [])
   const [sovItems, setSOVItems] = useKV<SOVItem[]>(`sov-items-${projectId}`, [])
   const [budgets] = useKV<Budget[]>(`budgets-${projectId}`, [])
+  const [costCodes] = useKV<CostCode[]>(`cost-codes-${projectId}`, [])
+  const [tasks] = useKV<Task[]>(`tasks-${projectId}`, [])
+  const [workPackages] = useKV<WorkPackage[]>(`work-packages-${projectId}`, [])
   const [isVersionDialogOpen, setIsVersionDialogOpen] = useState(false)
   const [isItemDialogOpen, setIsItemDialogOpen] = useState(false)
+  const [isAutoGenerateOpen, setIsAutoGenerateOpen] = useState(false)
   const [selectedVersion, setSelectedVersion] = useState<string | null>(null)
+  const [generating, setGenerating] = useState(false)
   
   const [versionForm, setVersionForm] = useState({
     periodStart: '',
@@ -192,6 +198,63 @@ export function SOVTrackingPage() {
       )
     )
     toast.success('SOV approved')
+  }
+
+  const handleAutoGenerate = async () => {
+    if (!versionForm.periodStart || !versionForm.periodEnd) {
+      toast.error('Please set period start and end dates')
+      return
+    }
+
+    if (!budgets || budgets.length === 0) {
+      toast.error('No budget data available. Create budgets first.')
+      return
+    }
+
+    setGenerating(true)
+    try {
+      const result = await generateSOVFromCostCodes(
+        {
+          projectId: projectId!,
+          periodStart: versionForm.periodStart,
+          periodEnd: versionForm.periodEnd,
+          retainagePercent: 10,
+          includeMaterialsStored: true,
+        },
+        budgets,
+        costCodes || [],
+        tasks || [],
+        workPackages || []
+      )
+
+      const newVersionId = crypto.randomUUID()
+      const newVersion: SOVVersion = {
+        ...result.version,
+        id: newVersionId,
+        versionNumber: (sovVersions?.length || 0) + 1,
+        createdAt: new Date().toISOString(),
+      }
+
+      const newItems: SOVItem[] = result.items.map(item => ({
+        ...item,
+        id: crypto.randomUUID(),
+        versionId: newVersionId,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }))
+
+      setSOVVersions(current => [...(current || []), newVersion])
+      setSOVItems(current => [...(current || []), ...newItems])
+      
+      setIsAutoGenerateOpen(false)
+      setIsVersionDialogOpen(false)
+      toast.success(`Generated SOV with ${result.items.length} line items from cost codes`)
+    } catch (error) {
+      console.error('Error generating SOV:', error)
+      toast.error('Failed to generate SOV')
+    } finally {
+      setGenerating(false)
+    }
   }
 
   const getStatusBadge = (status: SOVVersion['status']) => {
@@ -370,11 +433,21 @@ export function SOVTrackingPage() {
                   />
                 </div>
               </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setIsVersionDialogOpen(false)}>
-                  Cancel
+              <div className="flex justify-between items-center gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={handleAutoGenerate}
+                  disabled={generating || !versionForm.periodStart || !versionForm.periodEnd}
+                >
+                  <Sparkle size={16} className="mr-2" />
+                  {generating ? 'Generating...' : 'Auto-Generate from Cost Codes'}
                 </Button>
-                <Button onClick={handleCreateVersion}>Create Version</Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => setIsVersionDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleCreateVersion}>Create Version</Button>
+                </div>
               </div>
             </DialogContent>
           </Dialog>
