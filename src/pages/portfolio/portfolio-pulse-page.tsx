@@ -182,6 +182,13 @@ export function PortfolioPulsePage() {
     health: Math.round(h.margin_percent),
   }))
 
+  const marginAtRiskData = filteredHealthData.slice(0, 10).map(h => ({
+    name: h.project_name.substring(0, 20),
+    margin: Math.round(h.margin),
+    marginPercent: parseFloat(h.margin_percent.toFixed(1)),
+    status: h.health_status
+  }))
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -230,7 +237,7 @@ export function PortfolioPulsePage() {
         </Button>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Projects</CardTitle>
@@ -259,34 +266,47 @@ export function PortfolioPulsePage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Budget Performance</CardTitle>
-            {metrics.totalSpent <= metrics.totalBudget ? (
+            <CardTitle className="text-sm font-medium">Total Margin</CardTitle>
+            {metrics.totalSpent <= metrics.totalValue ? (
               <TrendUp size={20} className="text-accent" />
             ) : (
               <TrendDown size={20} className="text-destructive" />
             )}
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${metrics.totalSpent <= metrics.totalBudget ? 'text-accent' : 'text-destructive'}`}>
-              {((metrics.totalSpent / metrics.totalBudget) * 100).toFixed(1)}%
+            <div className={`text-2xl font-bold ${metrics.totalSpent <= metrics.totalValue ? 'text-accent' : 'text-destructive'}`}>
+              {formatCurrency(metrics.totalValue - metrics.totalSpent)}
             </div>
             <p className="text-xs text-muted-foreground">
-              {formatCurrency(metrics.totalSpent)} / {formatCurrency(metrics.totalBudget)}
+              {metrics.totalValue > 0 ? (((metrics.totalValue - metrics.totalSpent) / metrics.totalValue) * 100).toFixed(1) : 0}% margin
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={metrics.atRiskProjects > 0 ? 'border-destructive bg-destructive/5' : ''}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">At Risk</CardTitle>
-            <Warning size={20} className={metrics.atRiskProjects > 0 ? 'text-destructive' : 'text-muted-foreground'} />
+            <CardTitle className="text-sm font-medium">Critical Risk</CardTitle>
+            <Warning size={20} className={metrics.atRiskProjects > 0 ? 'text-destructive animate-pulse' : 'text-muted-foreground'} />
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${metrics.atRiskProjects > 0 ? 'text-destructive' : 'text-accent'}`}>
               {metrics.atRiskProjects}
             </div>
             <p className="text-xs text-muted-foreground">
-              {metrics.highRisks} high-priority risks
+              {metrics.highRisks} critical projects
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Risks</CardTitle>
+            <ChartLine size={20} className="text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{metrics.totalRisks}</div>
+            <p className="text-xs text-muted-foreground">
+              Total risk flags
             </p>
           </CardContent>
         </Card>
@@ -304,8 +324,8 @@ export function PortfolioPulsePage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>Project Health Dashboard</CardTitle>
-                  <CardDescription>Real-time status of all active projects</CardDescription>
+                  <CardTitle>Margin at Risk Analysis</CardTitle>
+                  <CardDescription>Critical projects sorted by financial risk and margin erosion</CardDescription>
                 </div>
                 <div className="flex gap-2">
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -348,30 +368,42 @@ export function PortfolioPulsePage() {
               ) : (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between text-sm text-muted-foreground">
-                    <span>Showing {filteredHealthData.length} of {projectHealthData.length} projects</span>
+                    <span>Showing {filteredHealthData.length} of {projectHealthData.length} projects (sorted by risk priority)</span>
                   </div>
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Project</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Schedule</TableHead>
-                        <TableHead>Budget</TableHead>
-                        <TableHead>Open RFIs</TableHead>
-                        <TableHead>Overdue Tasks</TableHead>
-                        <TableHead>Risks</TableHead>
+                        <TableHead>Health Status</TableHead>
+                        <TableHead className="text-right">Contract Value</TableHead>
+                        <TableHead className="text-right">Actual Cost</TableHead>
+                        <TableHead className="text-right">Margin $</TableHead>
+                        <TableHead className="text-right">Margin %</TableHead>
+                        <TableHead className="text-center">Risk Flags</TableHead>
                         <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filteredHealthData.map((health) => {
-                      const statusBadge = getStatusBadge(health.status)
+                      const statusBadge = getStatusBadge(health.health_status)
+                      const marginColor = health.margin_percent >= 15 ? 'text-accent' : 
+                                        health.margin_percent >= 10 ? 'text-warning' : 
+                                        health.margin_percent >= 5 ? 'text-destructive/80' : 
+                                        'text-destructive'
                       return (
-                        <TableRow key={health.project.id}>
+                        <TableRow key={health.project_id} className={health.health_status === 'critical' ? 'bg-destructive/5' : ''}>
                           <TableCell>
                             <div>
-                              <div className="font-medium">{health.project.name}</div>
-                              <div className="text-xs text-muted-foreground">{health.project.client}</div>
+                              <div className="font-medium flex items-center gap-2">
+                                {health.project_name}
+                                {health.health_status === 'critical' && (
+                                  <Badge variant="destructive" className="text-xs">
+                                    <Warning size={12} className="mr-1" />
+                                    Critical
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="text-xs text-muted-foreground">{health.project_number}</div>
                             </div>
                           </TableCell>
                           <TableCell>
@@ -380,45 +412,50 @@ export function PortfolioPulsePage() {
                               {statusBadge.label}
                             </Badge>
                           </TableCell>
+                          <TableCell className="text-right font-mono text-sm">
+                            {formatCurrency(health.contract_value)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm">
+                            {formatCurrency(health.actual_cost)}
+                          </TableCell>
+                          <TableCell className={`text-right font-mono text-sm font-semibold ${marginColor}`}>
+                            {formatCurrency(health.margin)}
+                          </TableCell>
+                          <TableCell className={`text-right font-mono text-sm font-bold ${marginColor}`}>
+                            {health.margin_percent.toFixed(1)}%
+                          </TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Progress value={health.scheduleHealth} className="w-16 h-2" />
-                              <span className="text-sm font-medium">{Math.round(health.scheduleHealth)}%</span>
+                            <div className="flex items-center justify-center gap-1">
+                              {health.aging_rfis > 0 && (
+                                <Badge variant="destructive" className="text-xs" title={`${health.aging_rfis} aging RFI(s)`}>
+                                  <Clock size={12} className="mr-1" />
+                                  {health.aging_rfis}
+                                </Badge>
+                              )}
+                              {health.over_budget_cost_codes > 0 && (
+                                <Badge variant="destructive" className="text-xs" title={`${health.over_budget_cost_codes} over-budget cost code(s)`}>
+                                  <CurrencyDollar size={12} className="mr-1" />
+                                  {health.over_budget_cost_codes}
+                                </Badge>
+                              )}
+                              {health.slipping_tasks > 0 && (
+                                <Badge variant="secondary" className="text-xs" title={`${health.slipping_tasks} slipping task(s)`}>
+                                  <TrendDown size={12} className="mr-1" />
+                                  {health.slipping_tasks}
+                                </Badge>
+                              )}
+                              {health.total_risk_flags === 0 && (
+                                <span className="text-muted-foreground text-xs">None</span>
+                              )}
                             </div>
-                          </TableCell>
-                          <TableCell>
-                            <span className={`text-sm font-medium ${health.budgetHealth >= 0 ? 'text-accent' : 'text-destructive'}`}>
-                              {health.budgetHealth >= 0 ? '+' : ''}{Math.round(health.budgetHealth)}%
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            {health.rfiCount > 0 ? (
-                              <Badge variant="secondary">{health.rfiCount}</Badge>
-                            ) : (
-                              <span className="text-muted-foreground">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {health.overdueTasks > 0 ? (
-                              <Badge variant="destructive">{health.overdueTasks}</Badge>
-                            ) : (
-                              <span className="text-muted-foreground">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {health.risks > 0 ? (
-                              <Badge variant="outline">{health.risks}</Badge>
-                            ) : (
-                              <span className="text-muted-foreground">-</span>
-                            )}
                           </TableCell>
                           <TableCell>
                             <Button
                               size="sm"
-                              variant="outline"
-                              onClick={() => navigate(`/projects/${health.project.id}`)}
+                              variant={health.health_status === 'critical' ? 'default' : 'outline'}
+                              onClick={() => navigate(`/projects/${health.project_id}`)}
                             >
-                              View
+                              {health.health_status === 'critical' ? 'Review Now' : 'View'}
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -430,24 +467,100 @@ export function PortfolioPulsePage() {
               )}
             </CardContent>
           </Card>
+
+          {filteredHealthData.filter(h => h.health_status === 'critical').length > 0 && (
+            <Card className="border-destructive bg-destructive/5">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-destructive">
+                  <Warning size={24} />
+                  Critical Projects Requiring Immediate Attention
+                </CardTitle>
+                <CardDescription>
+                  These projects have margin below 5% or multiple active risk flags
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {filteredHealthData
+                  .filter(h => h.health_status === 'critical')
+                  .map((health) => (
+                    <div key={health.project_id} className="bg-background p-4 rounded-lg border border-destructive">
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <h4 className="font-semibold text-lg">{health.project_name}</h4>
+                          <p className="text-sm text-muted-foreground">{health.project_number}</p>
+                        </div>
+                        <Button 
+                          size="sm"
+                          onClick={() => navigate(`/projects/${health.project_id}/pma`)}
+                          className="bg-destructive hover:bg-destructive/90"
+                        >
+                          View Insights
+                        </Button>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
+                        <div>
+                          <div className="text-xs text-muted-foreground mb-1">Margin at Risk</div>
+                          <div className={`text-lg font-bold ${health.margin_percent < 5 ? 'text-destructive' : 'text-warning'}`}>
+                            {health.margin_percent.toFixed(1)}%
+                          </div>
+                          <div className="text-xs text-muted-foreground">{formatCurrency(health.margin)}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-muted-foreground mb-1">Aging RFIs</div>
+                          <div className="text-lg font-bold text-destructive">{health.aging_rfis}</div>
+                          <div className="text-xs text-muted-foreground">of {health.open_rfis} open</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-muted-foreground mb-1">Over Budget</div>
+                          <div className="text-lg font-bold text-destructive">{health.over_budget_cost_codes}</div>
+                          <div className="text-xs text-muted-foreground">cost codes</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-muted-foreground mb-1">Schedule Slip</div>
+                          <div className="text-lg font-bold text-warning">{health.slipping_tasks}</div>
+                          <div className="text-xs text-muted-foreground">tasks behind</div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-2 border-t">
+                        <Badge variant="outline" className="text-xs">
+                          <CurrencyDollar size={12} className="mr-1" />
+                          {formatCurrency(health.contract_value)} Contract
+                        </Badge>
+                        <Badge variant="outline" className="text-xs">
+                          <TrendDown size={12} className="mr-1" />
+                          {formatCurrency(health.actual_cost)} Spent
+                        </Badge>
+                        {health.change_order_total > 0 && (
+                          <Badge variant="secondary" className="text-xs">
+                            +{formatCurrency(health.change_order_total)} in COs
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="performance" className="space-y-4">
           <div className="grid gap-6 md:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle>Budget Performance by Project</CardTitle>
-                <CardDescription>Budget health across portfolio</CardDescription>
+                <CardTitle>Margin at Risk by Project</CardTitle>
+                <CardDescription>Top 10 projects ranked by margin percentage</CardDescription>
               </CardHeader>
               <CardContent>
-                {budgetPerformance.length === 0 ? (
+                {marginAtRiskData.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 text-center">
                     <ChartLine size={48} className="text-muted-foreground mb-4" />
                     <h3 className="text-lg font-semibold mb-2">No data</h3>
                   </div>
                 ) : (
                   <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={budgetPerformance}>
+                    <BarChart data={marginAtRiskData}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                       <XAxis
                         dataKey="name"
@@ -458,7 +571,7 @@ export function PortfolioPulsePage() {
                       />
                       <YAxis
                         tick={{ fill: 'hsl(var(--muted-foreground))' }}
-                        label={{ value: 'Budget Health (%)', angle: -90, position: 'insideLeft' }}
+                        label={{ value: 'Margin %', angle: -90, position: 'insideLeft' }}
                       />
                       <Tooltip
                         contentStyle={{
@@ -466,8 +579,28 @@ export function PortfolioPulsePage() {
                           border: '1px solid hsl(var(--border))',
                           borderRadius: '0.5rem',
                         }}
+                        formatter={(value: number) => [`${value.toFixed(1)}%`, 'Margin']}
                       />
-                      <Bar dataKey="health" fill="hsl(var(--primary))" />
+                      <Bar 
+                        dataKey="marginPercent" 
+                        fill="hsl(var(--primary))"
+                        label={{ 
+                          position: 'top', 
+                          formatter: (value: number) => `${value}%`,
+                          fontSize: 10
+                        }}
+                      >
+                        {marginAtRiskData.map((entry, index) => (
+                          <Cell 
+                            key={`cell-${index}`} 
+                            fill={
+                              entry.status === 'critical' ? 'hsl(var(--destructive))' :
+                              entry.status === 'warning' ? 'hsl(var(--warning))' :
+                              'hsl(var(--accent))'
+                            }
+                          />
+                        ))}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 )}
@@ -508,6 +641,53 @@ export function PortfolioPulsePage() {
               </CardContent>
             </Card>
           </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Risk Distribution Summary</CardTitle>
+              <CardDescription>Overview of financial and operational risk across portfolio</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                <div className="space-y-2">
+                  <div className="text-sm text-muted-foreground">Critical Projects</div>
+                  <div className="text-3xl font-bold text-destructive">
+                    {projectHealthData.filter(p => p.health_status === 'critical').length}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Margin below 5%
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm text-muted-foreground">Warning Projects</div>
+                  <div className="text-3xl font-bold text-warning">
+                    {projectHealthData.filter(p => p.health_status === 'warning').length}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Margin 5-10%
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm text-muted-foreground">Healthy Projects</div>
+                  <div className="text-3xl font-bold text-accent">
+                    {projectHealthData.filter(p => p.health_status === 'healthy').length}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Margin above 10%
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm text-muted-foreground">Total Risk Flags</div>
+                  <div className="text-3xl font-bold">
+                    {projectHealthData.reduce((sum, p) => sum + p.total_risk_flags, 0)}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Across all projects
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           <div className="grid gap-6 md:grid-cols-3">
             <Card>
