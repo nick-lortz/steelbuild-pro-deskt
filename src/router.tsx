@@ -16,6 +16,7 @@ import { DocumentsPage } from '@/pages/documents/documents-page'
 import { DrawingsDBPage } from '@/pages/drawings/drawings-db-page'
 import { DrawingViewerPage } from '@/pages/drawings/drawing-viewer-page'
 import { WorkPackagesPage } from '@/pages/work-packages/work-packages-page'
+import { WorkPackageReadinessPage } from '@/pages/work-packages/work-package-readiness-page'
 import { DeliveriesPage } from '@/pages/deliveries/deliveries-page'
 import { LaborPage } from '@/pages/labor/labor-page'
 import { EquipmentPage as ProjectEquipmentPage } from '@/pages/equipment/equipment-page'
@@ -134,6 +135,10 @@ export const router = createBrowserRouter([
           {
             path: 'work-packages',
             element: <WorkPackagesPage />,
+          },
+          {
+            path: 'work-packages/readiness',
+            element: <WorkPackageReadinessPage />,
           },
           {
             path: 'deliveries',

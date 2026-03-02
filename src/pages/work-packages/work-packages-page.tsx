@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { useParams } from 'react-router-dom'
-import { Plus, Package, CheckCircle, Clock, Warning } from '@phosphor-icons/react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { Plus, Package, CheckCircle, Clock, Warning, GitBranch } from '@phosphor-icons/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -16,6 +16,7 @@ import type { WorkPackage } from '@/lib/types'
 
 export function WorkPackagesPage() {
   const { projectId } = useParams()
+  const navigate = useNavigate()
   const [packages, setPackages] = useKV<WorkPackage[]>(`work-packages-${projectId}`, [])
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [formData, setFormData] = useState({
@@ -73,7 +74,12 @@ export function WorkPackagesPage() {
           <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">Work Packages</h2>
           <p className="text-muted-foreground">Fabrication and erection package management</p>
         </div>
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => navigate(`/projects/${projectId}/work-packages/readiness`)}>
+            <GitBranch size={16} className="mr-2" />
+            Readiness Dashboard
+          </Button>
+          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>
             <Button>
               <Plus size={16} className="mr-2" />
@@ -135,7 +141,8 @@ export function WorkPackagesPage() {
               <Button onClick={handleCreate}>Create Package</Button>
             </div>
           </DialogContent>
-        </Dialog>
+          </Dialog>
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-4">
