@@ -9,6 +9,8 @@ import { calculateProjectScheduleHealth, forecastProjectCost, computeMarginAtRis
 import { projectsDb } from '@/lib/db'
 import type { Project } from '@/lib/types'
 import { toast } from 'sonner'
+import { AutoSuggestionBanner } from '@/components/shared/auto-gradient-suggestions'
+import type { SuggestionContext } from '@/lib/gradient-suggestions'
 
 export function ProjectDashboardPage() {
   const { projectId } = useParams()
@@ -74,6 +76,15 @@ export function ProjectDashboardPage() {
     return 'bg-red-500'
   }
 
+  const suggestionContext: SuggestionContext = {
+    projectType: project.type,
+    projectName: project.name,
+    client: project.client,
+    location: project.location,
+    budget: project.budgetAmount && project.budgetAmount > 5000000 ? 'high' : 
+            project.budgetAmount && project.budgetAmount > 1000000 ? 'medium' : 'low'
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -82,6 +93,13 @@ export function ProjectDashboardPage() {
           {project.number} • {project.client}
         </p>
       </div>
+
+      {projectId && (
+        <AutoSuggestionBanner 
+          context={suggestionContext}
+          projectId={projectId}
+        />
+      )}
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <Card>

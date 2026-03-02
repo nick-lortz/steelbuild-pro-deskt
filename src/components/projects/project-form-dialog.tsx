@@ -23,6 +23,8 @@ import { toast } from 'sonner'
 import { projectsDb } from '@/lib/db'
 import { businessRules, BusinessRuleError } from '@/lib/business-rules'
 import type { Project } from '@/lib/types'
+import { InlineGradientSuggestions } from '@/components/shared/auto-gradient-suggestions'
+import { useProjectGradient } from '@/hooks/use-gradient'
 
 interface ProjectFormDialogProps {
   open: boolean
@@ -38,6 +40,7 @@ export function ProjectFormDialog({
   project,
 }: ProjectFormDialogProps) {
   const [loading, setLoading] = useState(false)
+  const [selectedGradientId, setSelectedGradientId] = useState<string | undefined>()
   const { register, handleSubmit, setValue, watch } = useForm({
     defaultValues: project || {
       name: '',
@@ -48,8 +51,13 @@ export function ProjectFormDialog({
       contractValue: 0,
       startDate: new Date().toISOString().split('T')[0],
       description: '',
+      type: '',
     },
   })
+
+  const watchedName = watch('name')
+  const watchedClient = watch('client')
+  const watchedType = watch('type')
 
   const onSubmit = async (data: any) => {
     setLoading(true)
@@ -59,11 +67,20 @@ export function ProjectFormDialog({
         project?.id
       )
 
+      let projectId: string
       if (project) {
         await projectsDb.update(project.id, data)
+        projectId = project.id
         toast.success('Project updated successfully')
       } else {
-        await projectsDb.create(data)
+        const newProject = await projectsDb.create(data)
+        projectId = newProject.id
+        
+        if (selectedGradientId) {
+          const { setProjectGradient } = useProjectGradient(projectId)
+          setProjectGradient(selectedGradientId)
+        }
+        
         toast.success('Project created successfully')
       }
       onSuccess()
@@ -110,6 +127,37 @@ export function ProjectFormDialog({
               <Input id="location" {...register('location', { required: true })} />
             </div>
           </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="type">Project Type</Label>
+            <Select
+              defaultValue={watch('type')}
+              onValueChange={(value) => setValue('type', value)}
+            >
+              <SelectTrigger id="type">
+                <SelectValue placeholder="Select project type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Structural Steel">Structural Steel</SelectItem>
+                <SelectItem value="Steel Fabrication">Steel Fabrication</SelectItem>
+                <SelectItem value="Steel Erection">Steel Erection</SelectItem>
+                <SelectItem value="Commercial">Commercial</SelectItem>
+                <SelectItem value="Industrial">Industrial</SelectItem>
+                <SelectItem value="Bridge">Bridge</SelectItem>
+                <SelectItem value="High-Rise">High-Rise</SelectItem>
+                <SelectItem value="Residential">Residential</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {!project && (watchedName || watchedClient || watchedType) && (
+            <InlineGradientSuggestions
+              projectType={watchedType}
+              projectName={watchedName}
+              client={watchedClient}
+              onSelect={(presetId) => setSelectedGradientId(presetId)}
+            />
+          )}
 
           <div className="grid gap-4 md:grid-cols-3">
             <div className="space-y-2">
