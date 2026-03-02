@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Sparkle,
@@ -25,59 +25,31 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Progress } from '@/components/ui/progress'
 import { toast } from 'sonner'
+import { usePMAInsights } from '@/hooks/use-database'
 import type { PMAInsight } from '@/types/electron'
 
 export function PMADailyBriefPage() {
   const { projectId } = useParams()
   const navigate = useNavigate()
-  const [insights, setInsights] = useState<PMAInsight[]>([])
-  const [loading, setLoading] = useState(true)
+  const { insights, loading, generateInsights, resolveInsight, dismissInsight } = usePMAInsights(projectId)
+  
   const [scanning, setScanning] = useState(false)
   const [isDismissOpen, setIsDismissOpen] = useState(false)
   const [selectedInsight, setSelectedInsight] = useState<PMAInsight | null>(null)
   const [dismissReason, setDismissReason] = useState('')
-  
-  const isDesktop = typeof window !== 'undefined' && window.SBP?.db
-
-  useEffect(() => {
-    loadInsights()
-  }, [projectId])
-
-  const loadInsights = async () => {
-    if (!projectId || !isDesktop) {
-      setLoading(false)
-      return
-    }
-
-    setLoading(true)
-    try {
-      const result = await window.SBP!.db.listPMAInsights(projectId)
-      if (result.success && result.data) {
-        setInsights(result.data)
-      } else {
-        toast.error('Failed to load insights')
-      }
-    } catch (error) {
-      console.error('Failed to load insights:', error)
-      toast.error('Failed to load insights')
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const handleRunScan = async () => {
-    if (!projectId || !isDesktop) return
+    if (!projectId) return
     
     setScanning(true)
     try {
-      const result = await window.SBP!.db.generatePMAInsights(projectId)
+      const result = await generateInsights()
       if (result.success && result.data) {
         if (result.data.length > 0) {
           toast.success(`Generated ${result.data.length} new insight${result.data.length !== 1 ? 's' : ''}`)
         } else {
           toast.info('No new insights detected')
         }
-        await loadInsights()
       } else {
         toast.error('Failed to generate insights')
       }
@@ -90,13 +62,12 @@ export function PMADailyBriefPage() {
   }
 
   const handleResolve = async (insightId: string) => {
-    if (!projectId || !isDesktop) return
+    if (!projectId) return
     
     try {
-      const result = await window.SBP!.db.resolvePMAInsight(insightId, 'Current User')
+      const result = await resolveInsight(insightId, 'Current User')
       if (result.success) {
         toast.success('Insight marked as resolved')
-        await loadInsights()
       } else {
         toast.error('Failed to resolve insight')
       }
@@ -107,7 +78,7 @@ export function PMADailyBriefPage() {
   }
 
   const handleDismiss = async () => {
-    if (!projectId || !selectedInsight || !isDesktop) return
+    if (!projectId || !selectedInsight) return
     
     if (!dismissReason.trim()) {
       toast.error('Please provide a reason for dismissing')
@@ -115,13 +86,12 @@ export function PMADailyBriefPage() {
     }
     
     try {
-      const result = await window.SBP!.db.dismissPMAInsight(selectedInsight.id, 'Current User', dismissReason)
+      const result = await dismissInsight(selectedInsight.id, 'Current User', dismissReason)
       if (result.success) {
         toast.success('Insight dismissed')
         setIsDismissOpen(false)
         setSelectedInsight(null)
         setDismissReason('')
-        await loadInsights()
       } else {
         toast.error('Failed to dismiss insight')
       }
@@ -165,22 +135,6 @@ export function PMADailyBriefPage() {
   const highCount = activeInsights.filter(i => i.severity === 'high').length
   const mediumCount = activeInsights.filter(i => i.severity === 'medium').length
   const lowCount = activeInsights.filter(i => i.severity === 'low').length
-
-  if (!isDesktop) {
-    return (
-      <div className="flex items-center justify-center h-[50vh]">
-        <div className="text-center space-y-4">
-          <Warning size={64} className="mx-auto text-muted-foreground" />
-          <div>
-            <h2 className="text-xl font-semibold">Desktop Mode Required</h2>
-            <p className="text-muted-foreground mt-2">
-              The PMA Daily Brief is only available in desktop mode.
-            </p>
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="space-y-6">

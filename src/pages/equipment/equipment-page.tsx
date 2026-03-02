@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
+import { ErrorBoundary } from 'react-error-boundary'
 import { Plus, Wrench, CheckCircle, Warning, Gear, PencilSimple, Trash } from '@phosphor-icons/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -12,62 +13,40 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
-import { equipmentDb, equipmentLogsDb } from '@/lib/db'
-import type { Equipment, EquipmentLog } from '@/lib/types'
+import { useEquipment } from '@/hooks/use-database'
+import type { Equipment } from '@/types/electron'
 
-export function EquipmentPage() {
+function EquipmentError({ error, resetErrorBoundary }: { error: Error; resetErrorBoundary: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-12 space-y-4">
+      <Warning size={64} className="text-destructive" />
+      <div className="text-center space-y-2">
+        <h3 className="font-semibold text-lg">Something went wrong</h3>
+        <p className="text-sm text-muted-foreground">{error.message}</p>
+      </div>
+      <Button onClick={resetErrorBoundary}>Try Again</Button>
+    </div>
+  )
+}
+
+function EquipmentPageContent() {
   const { projectId } = useParams()
-  const [equipment, setEquipment] = useState<Equipment[]>([])
-  const [equipmentLogs, setEquipmentLogs] = useState<EquipmentLog[]>([])
-  const [loading, setLoading] = useState(true)
+  const { equipment, loading, error, createEquipment, updateEquipment, deleteEquipment } = useEquipment(projectId)
   
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
-  const [isLogOpen, setIsLogOpen] = useState(false)
   const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null)
-  const [selectedEquipmentId, setSelectedEquipmentId] = useState<string>('')
   
   const [formData, setFormData] = useState({
     name: '',
-    type: 'other' as Equipment['type'],
-    model: '',
-    serialNumber: '',
-    status: 'available' as Equipment['status'],
-    location: '',
+    type: 'crane',
+    asset_tag: '',
+    status: 'available',
+    assigned_to: '',
+    notes: '',
   })
 
-  const [logForm, setLogForm] = useState({
-    type: 'usage' as EquipmentLog['type'],
-    date: new Date().toISOString().split('T')[0],
-    hours: '',
-    description: '',
-    cost: '',
-    performedBy: '',
-  })
-
-  const loadData = async () => {
-    if (!projectId) return
-    setLoading(true)
-    try {
-      const [allEquipment, allLogs] = await Promise.all([
-        equipmentDb.getAll(),
-        equipmentLogsDb.getByProject(projectId),
-      ])
-      setEquipment(allEquipment.filter(e => e.assignedProjectId === projectId))
-      setEquipmentLogs(allLogs)
-    } catch (error) {
-      console.error('Failed to load equipment data:', error)
-      toast.error('Failed to load equipment data')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    loadData()
-  }, [projectId])
-
-  const projectEquipment = equipment
+  const projectEquipment = equipment || []
   const availableCount = projectEquipment.filter(e => e.status === 'available').length
   const inUseCount = projectEquipment.filter(e => e.status === 'in-use').length
   const maintenanceCount = projectEquipment.filter(e => e.status === 'maintenance').length
@@ -78,31 +57,28 @@ export function EquipmentPage() {
       return
     }
 
-    try {
-      await equipmentDb.create({
-        name: formData.name,
-        type: formData.type,
-        model: formData.model || undefined,
-        serialNumber: formData.serialNumber || undefined,
-        status: 'available',
-        location: formData.location || undefined,
-        assignedProjectId: projectId,
-      })
+    const result = await createEquipment({
+      name: formData.name,
+      type: formData.type,
+      asset_tag: formData.asset_tag || undefined,
+      status: 'available',
+      assigned_to: formData.assigned_to || undefined,
+      notes: formData.notes || undefined,
+    })
 
-      await loadData()
+    if (result.success) {
       setIsCreateOpen(false)
       setFormData({
         name: '',
-        type: 'other',
-        model: '',
-        serialNumber: '',
+        type: 'crane',
+        asset_tag: '',
         status: 'available',
-        location: '',
+        assigned_to: '',
+        notes: '',
       })
       toast.success('Equipment added')
-    } catch (error: any) {
-      console.error('Failed to create equipment:', error)
-      toast.error(error.message || 'Failed to add equipment')
+    } else {
+      toast.error(result.error || 'Failed to add equipment')
     }
   }
 
@@ -111,10 +87,10 @@ export function EquipmentPage() {
     setFormData({
       name: equip.name,
       type: equip.type,
-      model: equip.model || '',
-      serialNumber: equip.serialNumber || '',
+      asset_tag: equip.asset_tag || '',
       status: equip.status,
-      location: equip.location || '',
+      assigned_to: equip.assigned_to || '',
+      notes: equip.notes || '',
     })
     setIsEditOpen(true)
   }
@@ -125,89 +101,49 @@ export function EquipmentPage() {
       return
     }
 
-    try {
-      await equipmentDb.update(editingEquipment.id, {
-        name: formData.name,
-        type: formData.type,
-        model: formData.model || undefined,
-        serialNumber: formData.serialNumber || undefined,
-        status: formData.status,
-        location: formData.location || undefined,
-      })
+    const result = await updateEquipment(editingEquipment.id, {
+      name: formData.name,
+      type: formData.type,
+      asset_tag: formData.asset_tag || undefined,
+      status: formData.status,
+      assigned_to: formData.assigned_to || undefined,
+      notes: formData.notes || undefined,
+    })
 
-      await loadData()
+    if (result.success) {
       setIsEditOpen(false)
       setEditingEquipment(null)
       setFormData({
         name: '',
-        type: 'other',
-        model: '',
-        serialNumber: '',
+        type: 'crane',
+        asset_tag: '',
         status: 'available',
-        location: '',
+        assigned_to: '',
+        notes: '',
       })
       toast.success('Equipment updated')
-    } catch (error: any) {
-      console.error('Failed to update equipment:', error)
-      toast.error(error.message || 'Failed to update equipment')
+    } else {
+      toast.error(result.error || 'Failed to update equipment')
     }
   }
 
   const handleDelete = async (equipmentId: string) => {
-    try {
-      await equipmentDb.delete(equipmentId)
-      await loadData()
+    const result = await deleteEquipment(equipmentId, 'Current User')
+    if (result.success) {
       toast.success('Equipment deleted')
-    } catch (error: any) {
-      console.error('Failed to delete equipment:', error)
-      toast.error(error.message || 'Failed to delete equipment')
+    } else {
+      toast.error(result.error || 'Failed to delete equipment')
     }
   }
 
-  const handleAddLog = async () => {
-    if (!logForm.description || !logForm.performedBy || !selectedEquipmentId) {
-      toast.error('Please fill in required fields')
-      return
-    }
-
-    try {
-      await equipmentLogsDb.create({
-        equipmentId: selectedEquipmentId,
-        projectId,
-        date: logForm.date,
-        type: logForm.type,
-        hours: logForm.hours ? parseFloat(logForm.hours) : undefined,
-        description: logForm.description,
-        cost: logForm.cost ? parseFloat(logForm.cost) : undefined,
-        performedBy: logForm.performedBy,
-      })
-
-      await loadData()
-      setIsLogOpen(false)
-      setSelectedEquipmentId('')
-      setLogForm({
-        type: 'usage',
-        date: new Date().toISOString().split('T')[0],
-        hours: '',
-        description: '',
-        cost: '',
-        performedBy: '',
-      })
-      toast.success('Log added successfully')
-    } catch (error: any) {
-      console.error('Failed to add log:', error)
-      toast.error(error.message || 'Failed to add log')
-    }
-  }
-
-  const getStatusBadge = (status: Equipment['status']) => {
-    const variants: Record<Equipment['status'], { variant: 'default' | 'secondary' | 'destructive' | 'outline', icon: JSX.Element }> = {
+  const getStatusBadge = (status: string) => {
+    const variants: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline', icon: JSX.Element }> = {
       available: { variant: 'default', icon: <CheckCircle className="mr-1" size={14} /> },
       'in-use': { variant: 'secondary', icon: <Gear className="mr-1" size={14} /> },
       maintenance: { variant: 'outline', icon: <Warning className="mr-1" size={14} /> },
       retired: { variant: 'destructive', icon: <Wrench className="mr-1" size={14} /> },
     }
-    const config = variants[status]
+    const config = variants[status] || variants.available
     return (
       <Badge variant={config.variant} className="flex items-center w-fit">
         {config.icon}
@@ -216,8 +152,27 @@ export function EquipmentPage() {
     )
   }
 
-  const getEquipmentName = (equipId: string) => {
-    return equipment?.find(e => e.id === equipId)?.name || 'Unknown'
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center space-y-4">
+          <Gear size={48} className="mx-auto text-muted-foreground animate-spin" />
+          <p className="text-muted-foreground">Loading equipment...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 space-y-4">
+        <Warning size={64} className="text-destructive" />
+        <div className="text-center space-y-2">
+          <h3 className="font-semibold text-lg">Failed to load equipment</h3>
+          <p className="text-sm text-muted-foreground">{error}</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -227,176 +182,75 @@ export function EquipmentPage() {
           <h2 className="text-2xl font-bold tracking-tight">Equipment</h2>
           <p className="text-muted-foreground">Manage project equipment and track usage</p>
         </div>
-        <div className="flex gap-2">
-          <Dialog open={isLogOpen} onOpenChange={setIsLogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline">
-                <Wrench className="mr-2" />
-                Log Activity
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Log Equipment Activity</DialogTitle>
-                <DialogDescription>Record usage, maintenance, or inspection</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="log-equip">Equipment</Label>
-                  <Select value={selectedEquipmentId} onValueChange={setSelectedEquipmentId}>
-                    <SelectTrigger id="log-equip">
-                      <SelectValue placeholder="Select equipment" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {projectEquipment.map(e => (
-                        <SelectItem key={e.id} value={e.id}>
-                          {e.name} ({e.type})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="log-type">Activity Type</Label>
-                  <Select value={logForm.type} onValueChange={v => setLogForm(prev => ({ ...prev, type: v as EquipmentLog['type'] }))}>
-                    <SelectTrigger id="log-type">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="usage">Usage</SelectItem>
-                      <SelectItem value="maintenance">Maintenance</SelectItem>
-                      <SelectItem value="inspection">Inspection</SelectItem>
-                      <SelectItem value="repair">Repair</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="log-date">Date</Label>
-                  <Input
-                    id="log-date"
-                    type="date"
-                    value={logForm.date}
-                    onChange={e => setLogForm(prev => ({ ...prev, date: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="log-hours">Hours (Optional)</Label>
-                  <Input
-                    id="log-hours"
-                    type="number"
-                    step="0.5"
-                    value={logForm.hours}
-                    onChange={e => setLogForm(prev => ({ ...prev, hours: e.target.value }))}
-                    placeholder="8.0"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="log-desc">Description</Label>
-                  <Textarea
-                    id="log-desc"
-                    value={logForm.description}
-                    onChange={e => setLogForm(prev => ({ ...prev, description: e.target.value }))}
-                    placeholder="Activity details..."
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="log-cost">Cost (Optional)</Label>
-                    <Input
-                      id="log-cost"
-                      type="number"
-                      step="0.01"
-                      value={logForm.cost}
-                      onChange={e => setLogForm(prev => ({ ...prev, cost: e.target.value }))}
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="log-by">Performed By</Label>
-                    <Input
-                      id="log-by"
-                      value={logForm.performedBy}
-                      onChange={e => setLogForm(prev => ({ ...prev, performedBy: e.target.value }))}
-                      placeholder="Name"
-                    />
-                  </div>
-                </div>
-                <Button onClick={handleCreateLog} className="w-full">Create Log</Button>
+        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="mr-2" />
+              Add Equipment
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add Equipment</DialogTitle>
+              <DialogDescription>Add equipment to this project</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="name">Equipment Name</Label>
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="e.g., Tower Crane #3"
+                />
               </div>
-            </DialogContent>
-          </Dialog>
-          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2" />
-                Add Equipment
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add Equipment</DialogTitle>
-                <DialogDescription>Add equipment to this project</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="name">Equipment Name</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="e.g., Tower Crane #3"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="type">Type</Label>
-                  <Select value={formData.type} onValueChange={v => setFormData(prev => ({ ...prev, type: v as Equipment['type'] }))}>
-                    <SelectTrigger id="type">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="crane">Crane</SelectItem>
-                      <SelectItem value="welder">Welder</SelectItem>
-                      <SelectItem value="lift">Lift</SelectItem>
-                      <SelectItem value="tool">Tool</SelectItem>
-                      <SelectItem value="vehicle">Vehicle</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="model">Model (Optional)</Label>
-                    <Input
-                      id="model"
-                      value={formData.model}
-                      onChange={e => setFormData(prev => ({ ...prev, model: e.target.value }))}
-                      placeholder="Model #"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="serial">Serial # (Optional)</Label>
-                    <Input
-                      id="serial"
-                      value={formData.serialNumber}
-                      onChange={e => setFormData(prev => ({ ...prev, serialNumber: e.target.value }))}
-                      placeholder="S/N"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="location">Location (Optional)</Label>
-                  <Input
-                    id="location"
-                    value={formData.location}
-                    onChange={e => setFormData(prev => ({ ...prev, location: e.target.value }))}
-                    placeholder="Current location"
-                  />
-                </div>
-                <Button onClick={handleCreate} className="w-full">Add Equipment</Button>
+              <div>
+                <Label htmlFor="type">Type</Label>
+                <Select value={formData.type} onValueChange={v => setFormData(prev => ({ ...prev, type: v }))}>
+                  <SelectTrigger id="type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="crane">Crane</SelectItem>
+                    <SelectItem value="welder">Welder</SelectItem>
+                    <SelectItem value="lift">Lift</SelectItem>
+                    <SelectItem value="tool">Tool</SelectItem>
+                    <SelectItem value="vehicle">Vehicle</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-            </DialogContent>
-          </Dialog>
-        </div>
+              <div>
+                <Label htmlFor="asset-tag">Asset Tag (Optional)</Label>
+                <Input
+                  id="asset-tag"
+                  value={formData.asset_tag}
+                  onChange={e => setFormData(prev => ({ ...prev, asset_tag: e.target.value }))}
+                  placeholder="Asset tag or ID"
+                />
+              </div>
+              <div>
+                <Label htmlFor="assigned-to">Assigned To (Optional)</Label>
+                <Input
+                  id="assigned-to"
+                  value={formData.assigned_to}
+                  onChange={e => setFormData(prev => ({ ...prev, assigned_to: e.target.value }))}
+                  placeholder="Person or team"
+                />
+              </div>
+              <div>
+                <Label htmlFor="notes">Notes (Optional)</Label>
+                <Textarea
+                  id="notes"
+                  value={formData.notes}
+                  onChange={e => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                  placeholder="Additional information"
+                />
+              </div>
+              <Button onClick={handleCreate} className="w-full">Add Equipment</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -463,10 +317,9 @@ export function EquipmentPage() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Type</TableHead>
-                  <TableHead>Model</TableHead>
-                  <TableHead>Serial Number</TableHead>
+                  <TableHead>Asset Tag</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Location</TableHead>
+                  <TableHead>Assigned To</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -475,10 +328,9 @@ export function EquipmentPage() {
                   <TableRow key={equip.id}>
                     <TableCell className="font-medium">{equip.name}</TableCell>
                     <TableCell className="capitalize">{equip.type}</TableCell>
-                    <TableCell>{equip.model || '-'}</TableCell>
-                    <TableCell>{equip.serialNumber || '-'}</TableCell>
+                    <TableCell>{equip.asset_tag || '-'}</TableCell>
                     <TableCell>{getStatusBadge(equip.status)}</TableCell>
-                    <TableCell>{equip.location || '-'}</TableCell>
+                    <TableCell>{equip.assigned_to || '-'}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button variant="ghost" size="sm" onClick={() => handleEdit(equip)}>
@@ -494,7 +346,7 @@ export function EquipmentPage() {
                             <AlertDialogHeader>
                               <AlertDialogTitle>Remove Equipment</AlertDialogTitle>
                               <AlertDialogDescription>
-                                Remove this equipment from the project? It will remain in the global equipment list.
+                                Are you sure you want to remove this equipment from the project?
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
@@ -513,41 +365,6 @@ export function EquipmentPage() {
         </CardContent>
       </Card>
 
-      {equipmentLogs && equipmentLogs.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Activity Log</CardTitle>
-            <CardDescription>Recent equipment activities</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Equipment</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Hours</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Performed By</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {equipmentLogs.slice(-10).reverse().map(log => (
-                  <TableRow key={log.id}>
-                    <TableCell>{new Date(log.date).toLocaleDateString()}</TableCell>
-                    <TableCell className="font-medium">{getEquipmentName(log.equipmentId)}</TableCell>
-                    <TableCell className="capitalize">{log.type}</TableCell>
-                    <TableCell>{log.hours ? `${log.hours}h` : '-'}</TableCell>
-                    <TableCell>{log.description}</TableCell>
-                    <TableCell>{log.performedBy}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
-
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent>
           <DialogHeader>
@@ -565,7 +382,7 @@ export function EquipmentPage() {
             </div>
             <div>
               <Label htmlFor="edit-type">Type</Label>
-              <Select value={formData.type} onValueChange={v => setFormData(prev => ({ ...prev, type: v as Equipment['type'] }))}>
+              <Select value={formData.type} onValueChange={v => setFormData(prev => ({ ...prev, type: v }))}>
                 <SelectTrigger id="edit-type">
                   <SelectValue />
                 </SelectTrigger>
@@ -581,7 +398,7 @@ export function EquipmentPage() {
             </div>
             <div>
               <Label htmlFor="edit-status">Status</Label>
-              <Select value={formData.status} onValueChange={v => setFormData(prev => ({ ...prev, status: v as Equipment['status'] }))}>
+              <Select value={formData.status} onValueChange={v => setFormData(prev => ({ ...prev, status: v }))}>
                 <SelectTrigger id="edit-status">
                   <SelectValue />
                 </SelectTrigger>
@@ -593,30 +410,28 @@ export function EquipmentPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="edit-model">Model</Label>
-                <Input
-                  id="edit-model"
-                  value={formData.model}
-                  onChange={e => setFormData(prev => ({ ...prev, model: e.target.value }))}
-                />
-              </div>
-              <div>
-                <Label htmlFor="edit-serial">Serial #</Label>
-                <Input
-                  id="edit-serial"
-                  value={formData.serialNumber}
-                  onChange={e => setFormData(prev => ({ ...prev, serialNumber: e.target.value }))}
-                />
-              </div>
+            <div>
+              <Label htmlFor="edit-asset-tag">Asset Tag</Label>
+              <Input
+                id="edit-asset-tag"
+                value={formData.asset_tag}
+                onChange={e => setFormData(prev => ({ ...prev, asset_tag: e.target.value }))}
+              />
             </div>
             <div>
-              <Label htmlFor="edit-location">Location</Label>
+              <Label htmlFor="edit-assigned-to">Assigned To</Label>
               <Input
-                id="edit-location"
-                value={formData.location}
-                onChange={e => setFormData(prev => ({ ...prev, location: e.target.value }))}
+                id="edit-assigned-to"
+                value={formData.assigned_to}
+                onChange={e => setFormData(prev => ({ ...prev, assigned_to: e.target.value }))}
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-notes">Notes</Label>
+              <Textarea
+                id="edit-notes"
+                value={formData.notes}
+                onChange={e => setFormData(prev => ({ ...prev, notes: e.target.value }))}
               />
             </div>
             <Button onClick={handleUpdate} className="w-full">Update Equipment</Button>
@@ -624,5 +439,13 @@ export function EquipmentPage() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+export function EquipmentPage() {
+  return (
+    <ErrorBoundary FallbackComponent={EquipmentError}>
+      <EquipmentPageContent />
+    </ErrorBoundary>
   )
 }

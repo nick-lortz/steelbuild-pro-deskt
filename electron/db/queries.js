@@ -668,6 +668,51 @@ async function generatePMAInsights(projectId) {
     }
   }
   
+  const overBudgetCostCodes = sqliteDb.prepare(`
+    SELECT * FROM cost_codes 
+    WHERE project_id = ? 
+      AND deleted_at IS NULL
+      AND actual_amount > budget_amount
+      AND budget_amount > 0
+  `).all(projectId);
+  
+  for (const costCode of overBudgetCostCodes) {
+    const overage = costCode.actual_amount - costCode.budget_amount;
+    const percentageOver = ((overage / costCode.budget_amount) * 100).toFixed(1);
+    const severity = percentageOver > 20 ? 'high' : percentageOver > 10 ? 'medium' : 'low';
+    
+    const insight = {
+      project_id: projectId,
+      severity,
+      type: 'budget-overage',
+      title: `Cost Code ${costCode.code} is over budget by ${percentageOver}%`,
+      details: `Cost code "${costCode.description}" has actual costs of $${costCode.actual_amount.toFixed(2)} vs budgeted $${costCode.budget_amount.toFixed(2)} (overage: $${overage.toFixed(2)}).`,
+      entity_refs: [
+        {
+          entity_type: 'cost_code',
+          entity_id: costCode.id,
+          label: `Cost Code ${costCode.code}`,
+          link: `/projects/${projectId}/cost-codes?code=${costCode.id}`
+        }
+      ]
+    };
+    
+    const existing = sqliteDb.prepare(`
+      SELECT id FROM pma_insights 
+      WHERE project_id = ? 
+        AND type = 'budget-overage' 
+        AND entity_refs_json LIKE ?
+        AND status = 'open'
+    `).get(projectId, `%"entity_id":"${costCode.id}"%`);
+    
+    if (!existing) {
+      const result = await createPMAInsight(insight);
+      if (result.success) {
+        insights.push(result.data);
+      }
+    }
+  }
+  
   return { success: true, data: insights };
 }
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { RFI, Equipment, CostCode, DashboardCounts, DBResult } from '@/types/electron';
+import type { RFI, Equipment, CostCode, DashboardCounts, DBResult, PMAInsight, Task } from '@/types/electron';
 
 const isDesktop = typeof window !== 'undefined' && window.SBP?.db;
 
@@ -18,6 +18,10 @@ const fallbackDB = {
   updateCostCode: async () => ({ success: false, error: 'Not running in desktop mode' }),
   deleteCostCode: async () => ({ success: false, error: 'Not running in desktop mode' }),
   getDashboardCounts: async () => ({ success: false, data: { rfi_count: 0, equipment_count: 0, cost_code_count: 0, total_budget: 0, total_actual: 0 } }),
+  listPMAInsights: async () => ({ success: false, data: [] as PMAInsight[] }),
+  generatePMAInsights: async () => ({ success: false, data: [] as PMAInsight[] }),
+  resolvePMAInsight: async () => ({ success: false, error: 'Not running in desktop mode' }),
+  dismissPMAInsight: async () => ({ success: false, error: 'Not running in desktop mode' }),
 };
 
 export function useDatabase() {
@@ -293,5 +297,76 @@ export function useDashboardCounts(projectId: string | undefined) {
     loading,
     error,
     reload: loadCounts,
+  };
+}
+
+export function usePMAInsights(projectId: string | undefined) {
+  const { db, isDesktop } = useDatabase();
+  const [insights, setInsights] = useState<PMAInsight[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadInsights = useCallback(async () => {
+    if (!projectId || !isDesktop) {
+      setInsights([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const result = await db.listPMAInsights(projectId);
+      if (result.success && result.data) {
+        setInsights(result.data);
+      } else {
+        setError(result.error || 'Failed to load insights');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load insights');
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId, db, isDesktop]);
+
+  useEffect(() => {
+    loadInsights();
+  }, [loadInsights]);
+
+  const generateInsights = useCallback(async () => {
+    if (!projectId) return { success: false, error: 'No project selected' };
+    
+    const result = await db.generatePMAInsights(projectId);
+    if (result.success) {
+      await loadInsights();
+    }
+    return result;
+  }, [projectId, db, loadInsights]);
+
+  const resolveInsight = useCallback(async (id: string, userId: string) => {
+    const result = await db.resolvePMAInsight(id, userId);
+    if (result.success) {
+      await loadInsights();
+    }
+    return result;
+  }, [db, loadInsights]);
+
+  const dismissInsight = useCallback(async (id: string, userId: string, reason: string) => {
+    const result = await db.dismissPMAInsight(id, userId, reason);
+    if (result.success) {
+      await loadInsights();
+    }
+    return result;
+  }, [db, loadInsights]);
+
+  return {
+    insights,
+    loading,
+    error,
+    generateInsights,
+    resolveInsight,
+    dismissInsight,
+    reload: loadInsights,
   };
 }
