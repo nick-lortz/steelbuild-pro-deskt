@@ -408,7 +408,7 @@ export function PMAPage() {
                         <Badge variant="secondary">{insight.type.replace(/-/g, ' ')}</Badge>
                       </div>
                       <CardTitle className="text-lg">{insight.title}</CardTitle>
-                      <CardDescription>{insight.description}</CardDescription>
+                      <CardDescription>{insight.details}</CardDescription>
                     </div>
                     <div className="flex gap-2">
                       <Button size="sm" variant="outline" onClick={() => handleResolve(insight.id)}>
@@ -429,11 +429,11 @@ export function PMAPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {insight.dataReferences.length > 0 && (
+                  {insight.entityRefs.length > 0 && (
                     <div>
-                      <p className="text-sm font-medium mb-2">Data References:</p>
+                      <p className="text-sm font-medium mb-2">Related Entities:</p>
                       <div className="flex flex-wrap gap-2">
-                        {insight.dataReferences.map((ref, idx) => (
+                        {insight.entityRefs.map((ref, idx) => (
                           <Button key={idx} variant="outline" size="sm" asChild>
                             <a href={ref.link} className="gap-2">
                               {ref.label}
@@ -441,6 +441,32 @@ export function PMAPage() {
                             </a>
                           </Button>
                         ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {insight.reasoningInputs && (
+                    <div className="p-3 rounded-lg bg-muted/50 border">
+                      <p className="text-sm font-medium mb-2">Reasoning Trail:</p>
+                      <div className="space-y-1 text-xs text-muted-foreground">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <span className="font-medium">Value:</span> {insight.reasoningInputs.calculations.actualValue?.toFixed(1)}
+                          </div>
+                          <div>
+                            <span className="font-medium">Threshold:</span> {insight.reasoningInputs.calculations.thresholdValue?.toFixed(1)}
+                          </div>
+                        </div>
+                        {insight.reasoningInputs.triggers.length > 0 && (
+                          <div className="mt-2 pt-2 border-t">
+                            <span className="font-medium">Triggers:</span>
+                            <ul className="list-disc list-inside mt-1">
+                              {insight.reasoningInputs.triggers.map((trigger, i) => (
+                                <li key={i}>{trigger}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}

@@ -1,10 +1,10 @@
 export interface PMInsight {
   id: string
   projectId: string
-  type: 'rfi-aging' | 'schedule-slip' | 'delivery-risk' | 'budget-overrun' | 'missing-approval' | 'checklist-incomplete'
+  type: 'rfi-aging' | 'schedule-slip' | 'delivery-risk' | 'budget-overrun' | 'missing-approval' | 'checklist-incomplete' | 'critical-path-task-rfi' | 'cost-variance'
   severity: 'low' | 'medium' | 'high' | 'critical'
   title: string
-  description: string
+  details: string
   detectedAt: string
   status: 'active' | 'resolved' | 'dismissed'
   resolvedAt?: string
@@ -12,20 +12,27 @@ export interface PMInsight {
   dismissedAt?: string
   dismissedBy?: string
   dismissReason?: string
-  dataReferences: Array<{
-    type: 'rfi' | 'task' | 'delivery' | 'cost-code' | 'checklist' | 'approval'
+  entityRefs: Array<{
+    type: 'rfi' | 'task' | 'delivery' | 'cost-code' | 'checklist' | 'approval' | 'work-package'
     id: string
     label: string
     link: string
   }>
+  reasoningInputs: {
+    sourceData: Record<string, unknown>
+    thresholds: Record<string, number>
+    calculations: Record<string, number>
+    triggers: string[]
+  }
   recommendedActions: Array<{
     action: string
     priority: 'high' | 'medium' | 'low'
     link: string
   }>
-  metrics?: Record<string, number>
   followUpDate?: string
   reminderSent?: boolean
+  createdAt: string
+  updatedAt: string
 }
 
 export interface PMInsightConfig {

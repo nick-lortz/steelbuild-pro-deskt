@@ -22,6 +22,49 @@ export interface GeneratedSOVData {
   }
 }
 
+export interface SOVProgressUpdate {
+  itemId: string
+  previousPercent: number
+  newPercent: number
+  updatedBy: string
+  updatedAt: string
+  notes?: string
+  sourceType: 'manual' | 'field-progress' | 'task-completion' | 'work-package'
+  sourceId?: string
+}
+
+export interface SOVAuditEntry {
+  id: string
+  projectId: string
+  sovItemId: string
+  versionId: string
+  action: 'create' | 'update' | 'recalculate' | 'submit' | 'approve'
+  changes: {
+    field: string
+    oldValue: number | string
+    newValue: number | string
+  }[]
+  updatedBy: string
+  timestamp: string
+  notes?: string
+}
+
+export async function recordSOVAudit(entry: Omit<SOVAuditEntry, 'id' | 'timestamp'>): Promise<void> {
+  const auditEntry: SOVAuditEntry = {
+    ...entry,
+    id: crypto.randomUUID(),
+    timestamp: new Date().toISOString(),
+  }
+  
+  const existingAudits = await spark.kv.get<SOVAuditEntry[]>(`sov-audit-${entry.projectId}`) || []
+  await spark.kv.set(`sov-audit-${entry.projectId}`, [...existingAudits, auditEntry])
+}
+
+export async function getSOVAuditTrail(projectId: string, itemId?: string): Promise<SOVAuditEntry[]> {
+  const audits = await spark.kv.get<SOVAuditEntry[]>(`sov-audit-${projectId}`) || []
+  return itemId ? audits.filter(a => a.sovItemId === itemId) : audits
+}
+
 export async function generateSOVFromCostCodes(
   options: SOVGenerationOptions,
   budgets: Budget[],
@@ -153,6 +196,80 @@ export async function updateSOVFromProgress(
       updatedAt: new Date().toISOString(),
     }
   })
+}
+
+export async function updateSOVFromFieldProgress(
+  projectId: string,
+  sovItemId: string,
+  percentComplete: number,
+  updatedBy: string,
+  notes?: string
+): Promise<SOVItem> {
+  const sovItems = await spark.kv.get<SOVItem[]>(`sov-items-${projectId}`) || []
+  const item = sovItems.find(i => i.id === sovItemId)
+  
+  if (!item) {
+    throw new Error('SOV item not found')
+  }
+
+  if (percentComplete < 0 || percentComplete > 100) {
+    throw new Error('Percent complete must be between 0 and 100')
+  }
+
+  if (percentComplete < item.percentComplete) {
+    throw new Error('Progress cannot decrease. Current: ' + item.percentComplete + '%, Attempted: ' + percentComplete + '%')
+  }
+
+  const previousWorkCompleted = item.workCompleted
+  const previousPercentComplete = item.percentComplete
+
+  const workCompleted = item.scheduledValue * (percentComplete / 100)
+  const totalCompleted = workCompleted + item.materialsStored
+  const retainage = totalCompleted * (item.retainage / item.totalCompleted || 0.1)
+  const currentBilling = Math.max(0, totalCompleted - retainage - item.previouslyBilled)
+  const balance = item.scheduledValue - totalCompleted
+
+  const updatedItem: SOVItem = {
+    ...item,
+    workCompleted,
+    totalCompleted,
+    percentComplete,
+    retainage,
+    currentBilling,
+    balance,
+    updatedAt: new Date().toISOString(),
+  }
+
+  await recordSOVAudit({
+    projectId,
+    sovItemId: item.id,
+    versionId: item.versionId,
+    action: 'update',
+    changes: [
+      {
+        field: 'percentComplete',
+        oldValue: previousPercentComplete,
+        newValue: percentComplete,
+      },
+      {
+        field: 'workCompleted',
+        oldValue: previousWorkCompleted,
+        newValue: workCompleted,
+      },
+      {
+        field: 'currentBilling',
+        oldValue: item.currentBilling,
+        newValue: currentBilling,
+      },
+    ],
+    updatedBy,
+    notes,
+  })
+
+  const updatedItems = sovItems.map(i => (i.id === sovItemId ? updatedItem : i))
+  await spark.kv.set(`sov-items-${projectId}`, updatedItems)
+
+  return updatedItem
 }
 
 export function calculateSOVSummary(items: SOVItem[]) {

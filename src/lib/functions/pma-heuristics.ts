@@ -7,12 +7,23 @@ const DEFAULT_CONFIG: Record<string, PMInsightConfig> = {
     type: 'rfi-aging',
     enabled: true,
     thresholds: {
-      daysOpen: 7,
+      daysOpen: 4,
       criticalDays: 14,
-      highPriorityDays: 5,
+      highPriorityDays: 7,
     },
     reminderDays: 3,
     autoResolve: true,
+  },
+  'critical-path-task-rfi': {
+    id: 'critical-path-task-rfi',
+    type: 'critical-path-task-rfi',
+    enabled: true,
+    thresholds: {
+      daysOpen: 2,
+      criticalPathImpact: 1,
+    },
+    reminderDays: 1,
+    autoResolve: false,
   },
   'schedule-slip': {
     id: 'schedule-slip',
@@ -35,6 +46,18 @@ const DEFAULT_CONFIG: Record<string, PMInsightConfig> = {
       daysUntilDue: 3,
     },
     reminderDays: 1,
+    autoResolve: false,
+  },
+  'cost-variance': {
+    id: 'cost-variance',
+    type: 'cost-variance',
+    enabled: true,
+    thresholds: {
+      percentThreshold: 90,
+      criticalPercent: 105,
+      highPercent: 100,
+    },
+    reminderDays: 7,
     autoResolve: false,
   },
   'budget-overrun': {
@@ -407,6 +430,107 @@ export async function detectChecklistIncompleteSignals(
   return signals
 }
 
+export async function detectCriticalPathRFISignals(
+  projectId: string,
+  rfis: RFI[],
+  tasks: Task[]
+): Promise<PMHeuristicSignal[]> {
+  const config = await getInsightConfig(projectId)
+  const rfiConfig = config['critical-path-task-rfi']
+  if (!rfiConfig.enabled) return []
+
+  const now = new Date()
+  const signals: PMHeuristicSignal[] = []
+
+  const criticalPathTasks = tasks.filter(t => t.isCriticalPath && t.status !== 'completed')
+  
+  for (const task of criticalPathTasks) {
+    const relatedRFIs = rfis.filter(
+      rfi =>
+        (rfi.status === 'open' || rfi.status === 'escalated') &&
+        (rfi.question.toLowerCase().includes(task.name.toLowerCase()) ||
+          task.description?.toLowerCase().includes(rfi.number))
+    )
+
+    for (const rfi of relatedRFIs) {
+      const daysOpen = (now.getTime() - new Date(rfi.submittedDate).getTime()) / (1000 * 60 * 60 * 24)
+      
+      if (daysOpen >= rfiConfig.thresholds.daysOpen) {
+        signals.push({
+          type: 'critical-path-task-rfi',
+          severity: 'critical',
+          triggered: true,
+          value: daysOpen,
+          threshold: rfiConfig.thresholds.daysOpen,
+          message: `RFI #${rfi.number} affecting critical path task "${task.name}" open for ${Math.floor(daysOpen)} days`,
+          dataIds: [rfi.id, task.id],
+        })
+      }
+    }
+  }
+
+  return signals
+}
+
+export async function detectCostVarianceSignals(
+  projectId: string,
+  budgets: Budget[],
+  costCodes: CostCode[]
+): Promise<PMHeuristicSignal[]> {
+  const config = await getInsightConfig(projectId)
+  const costConfig = config['cost-variance']
+  if (!costConfig.enabled) return []
+
+  const signals: PMHeuristicSignal[] = []
+
+  for (const budget of budgets) {
+    const budgeted = budget.budgetedAmount || budget.allocatedAmount
+    const actual = budget.actualAmount || 0
+
+    if (budgeted === 0) continue
+
+    const percentSpent = (actual / budgeted) * 100
+    const variance = actual - budgeted
+
+    if (percentSpent >= costConfig.thresholds.criticalPercent) {
+      const costCode = costCodes.find(cc => cc.id === budget.costCodeId)
+      signals.push({
+        type: 'cost-variance',
+        severity: 'critical',
+        triggered: true,
+        value: percentSpent,
+        threshold: costConfig.thresholds.criticalPercent,
+        message: `Cost code "${costCode?.name || 'Unknown'}" actuals exceed budget by ${Math.abs(variance).toLocaleString('en-US', { style: 'currency', currency: 'USD' })} (${percentSpent.toFixed(1)}%)`,
+        dataIds: [budget.id, budget.costCodeId || ''],
+      })
+    } else if (percentSpent >= costConfig.thresholds.highPercent) {
+      const costCode = costCodes.find(cc => cc.id === budget.costCodeId)
+      signals.push({
+        type: 'cost-variance',
+        severity: 'high',
+        triggered: true,
+        value: percentSpent,
+        threshold: costConfig.thresholds.highPercent,
+        message: `Cost code "${costCode?.name || 'Unknown'}" at ${percentSpent.toFixed(1)}% of budget (variance: ${variance >= 0 ? '+' : ''}${variance.toLocaleString('en-US', { style: 'currency', currency: 'USD' })})`,
+        dataIds: [budget.id, budget.costCodeId || ''],
+      })
+    } else if (percentSpent >= costConfig.thresholds.percentThreshold) {
+      const costCode = costCodes.find(cc => cc.id === budget.costCodeId)
+      signals.push({
+        type: 'cost-variance',
+        severity: 'medium',
+        triggered: true,
+        value: percentSpent,
+        threshold: costConfig.thresholds.percentThreshold,
+        message: `Cost code "${costCode?.name || 'Unknown'}" approaching budget at ${percentSpent.toFixed(1)}%`,
+        dataIds: [budget.id, budget.costCodeId || ''],
+      })
+    }
+  }
+
+  return signals
+}
+
 export async function runAllHeuristics(projectId: string): Promise<PMHeuristicSignal[]> {
   const [tasks, rfis, deliveries, budgets, costCodes, checklistItems] = await Promise.all([
     spark.kv.get<Task[]>(`schedule-tasks-${projectId}`) || [],
@@ -419,25 +543,31 @@ export async function runAllHeuristics(projectId: string): Promise<PMHeuristicSi
 
   const [
     rfiSignals,
+    criticalPathRFISignals,
     scheduleSignals,
     deliverySignals,
     budgetSignals,
+    costVarianceSignals,
     approvalSignals,
     checklistSignals,
   ] = await Promise.all([
     detectRFIAgingSignals(projectId, rfis),
+    detectCriticalPathRFISignals(projectId, rfis, tasks),
     detectScheduleSlipSignals(projectId, tasks),
     detectDeliveryRiskSignals(projectId, deliveries),
     detectBudgetOverrunSignals(projectId, budgets, costCodes),
+    detectCostVarianceSignals(projectId, budgets, costCodes),
     detectMissingApprovalSignals(projectId),
     detectChecklistIncompleteSignals(projectId, checklistItems),
   ])
 
   return [
     ...rfiSignals,
+    ...criticalPathRFISignals,
     ...scheduleSignals,
     ...deliverySignals,
     ...budgetSignals,
+    ...costVarianceSignals,
     ...approvalSignals,
     ...checklistSignals,
   ]
@@ -447,15 +577,33 @@ export async function signalToInsight(
   projectId: string,
   signal: PMHeuristicSignal
 ): Promise<PMInsight> {
-  const dataReferences: PMInsight['dataReferences'] = []
+  const entityRefs: PMInsight['entityRefs'] = []
   const recommendedActions: PMInsight['recommendedActions'] = []
+  const now = new Date().toISOString()
+
+  const reasoningInputs: PMInsight['reasoningInputs'] = {
+    sourceData: {
+      signalType: signal.type,
+      detectedValue: signal.value,
+      entityIds: signal.dataIds,
+    },
+    thresholds: {
+      configured: signal.threshold,
+    },
+    calculations: {
+      actualValue: signal.value,
+      thresholdValue: signal.threshold,
+      variance: signal.value - signal.threshold,
+    },
+    triggers: [signal.message],
+  }
 
   switch (signal.type) {
     case 'rfi-aging':
-      dataReferences.push({
+      entityRefs.push({
         type: 'rfi',
         id: signal.dataIds[0],
-        label: `RFI #${signal.dataIds[0]}`,
+        label: `RFI #${signal.dataIds[0].slice(0, 8)}`,
         link: `/projects/${projectId}/rfis?highlight=${signal.dataIds[0]}`,
       })
       recommendedActions.push({
@@ -463,13 +611,42 @@ export async function signalToInsight(
         priority: signal.severity === 'critical' ? 'high' : 'medium',
         link: `/projects/${projectId}/rfis?highlight=${signal.dataIds[0]}`,
       })
+      reasoningInputs.sourceData.daysOpen = signal.value
+      reasoningInputs.thresholds.daysOpenThreshold = signal.threshold
+      break
+
+    case 'critical-path-task-rfi':
+      entityRefs.push({
+        type: 'rfi',
+        id: signal.dataIds[0],
+        label: `RFI #${signal.dataIds[0].slice(0, 8)}`,
+        link: `/projects/${projectId}/rfis?highlight=${signal.dataIds[0]}`,
+      })
+      entityRefs.push({
+        type: 'task',
+        id: signal.dataIds[1],
+        label: `Critical Path Task`,
+        link: `/projects/${projectId}/schedule?highlight=${signal.dataIds[1]}`,
+      })
+      recommendedActions.push({
+        action: 'Escalate RFI immediately - impacts critical path',
+        priority: 'high',
+        link: `/projects/${projectId}/rfis?highlight=${signal.dataIds[0]}`,
+      })
+      recommendedActions.push({
+        action: 'Review task dependencies and potential workarounds',
+        priority: 'high',
+        link: `/projects/${projectId}/schedule?highlight=${signal.dataIds[1]}`,
+      })
+      reasoningInputs.sourceData.criticalPathImpact = true
+      reasoningInputs.sourceData.daysOpen = signal.value
       break
 
     case 'schedule-slip':
-      dataReferences.push({
+      entityRefs.push({
         type: 'task',
         id: signal.dataIds[0],
-        label: `Task #${signal.dataIds[0]}`,
+        label: `Task #${signal.dataIds[0].slice(0, 8)}`,
         link: `/projects/${projectId}/schedule?highlight=${signal.dataIds[0]}`,
       })
       recommendedActions.push({
@@ -477,13 +654,14 @@ export async function signalToInsight(
         priority: signal.severity === 'critical' ? 'high' : 'medium',
         link: `/projects/${projectId}/schedule?highlight=${signal.dataIds[0]}`,
       })
+      reasoningInputs.sourceData.daysOverdue = signal.value
       break
 
     case 'delivery-risk':
-      dataReferences.push({
+      entityRefs.push({
         type: 'delivery',
         id: signal.dataIds[0],
-        label: `Delivery #${signal.dataIds[0]}`,
+        label: `Delivery #${signal.dataIds[0].slice(0, 8)}`,
         link: `/projects/${projectId}/deliveries?highlight=${signal.dataIds[0]}`,
       })
       recommendedActions.push({
@@ -491,20 +669,43 @@ export async function signalToInsight(
         priority: 'high',
         link: `/projects/${projectId}/deliveries?highlight=${signal.dataIds[0]}`,
       })
+      reasoningInputs.sourceData.daysDifference = signal.value
       break
 
-    case 'budget-overrun':
-      dataReferences.push({
+    case 'cost-variance':
+      entityRefs.push({
         type: 'cost-code',
         id: signal.dataIds[1],
         label: `Cost Code`,
-        link: `/projects/${projectId}/financials?costCode=${signal.dataIds[1]}`,
+        link: `/projects/${projectId}/cost-codes?highlight=${signal.dataIds[1]}`,
+      })
+      recommendedActions.push({
+        action: 'Review cost code actuals and forecast',
+        priority: signal.severity === 'critical' ? 'high' : 'medium',
+        link: `/projects/${projectId}/budget-tracking?costCode=${signal.dataIds[1]}`,
+      })
+      recommendedActions.push({
+        action: 'Evaluate cost-saving measures or re-allocate budget',
+        priority: 'medium',
+        link: `/projects/${projectId}/financials`,
+      })
+      reasoningInputs.sourceData.percentSpent = signal.value
+      reasoningInputs.calculations.budgetUtilization = signal.value
+      break
+
+    case 'budget-overrun':
+      entityRefs.push({
+        type: 'cost-code',
+        id: signal.dataIds[1],
+        label: `Cost Code`,
+        link: `/projects/${projectId}/cost-codes?highlight=${signal.dataIds[1]}`,
       })
       recommendedActions.push({
         action: 'Review budget allocation and spending',
         priority: signal.severity === 'critical' ? 'high' : 'medium',
         link: `/projects/${projectId}/budget-tracking`,
       })
+      reasoningInputs.sourceData.percentUsed = signal.value
       break
 
     case 'missing-approval':
@@ -513,10 +714,11 @@ export async function signalToInsight(
         priority: 'high',
         link: `/projects/${projectId}/change-orders`,
       })
+      reasoningInputs.sourceData.daysWaiting = signal.value
       break
 
     case 'checklist-incomplete':
-      dataReferences.push(...signal.dataIds.map(id => ({
+      entityRefs.push(...signal.dataIds.map(id => ({
         type: 'checklist' as const,
         id,
         label: `Checklist Item #${id.slice(0, 8)}`,
@@ -527,6 +729,7 @@ export async function signalToInsight(
         priority: 'medium',
         link: `/projects/${projectId}/job-setup`,
       })
+      reasoningInputs.sourceData.incompleteCount = signal.value
       break
   }
 
@@ -536,15 +739,14 @@ export async function signalToInsight(
     type: signal.type,
     severity: signal.severity,
     title: signal.message,
-    description: `Detected by heuristic rule. Value: ${signal.value.toFixed(1)}, Threshold: ${signal.threshold}`,
-    detectedAt: new Date().toISOString(),
+    details: `Detected by heuristic rule. Value: ${signal.value.toFixed(1)}, Threshold: ${signal.threshold}. ${reasoningInputs.triggers.join('. ')}`,
+    detectedAt: now,
     status: 'active',
-    dataReferences,
+    entityRefs,
     recommendedActions,
-    metrics: {
-      value: signal.value,
-      threshold: signal.threshold,
-    },
+    reasoningInputs,
+    createdAt: now,
+    updatedAt: now,
   }
 }
 
@@ -553,14 +755,14 @@ export async function generateInsightsFromSignals(projectId: string): Promise<PM
   
   const existingInsights = (await spark.kv.get<PMInsight[]>(`pm-insights-${projectId}`)) || []
   
-  const newInsights: PMInsight[] = []
+  const newInsights: PMInsight[]= []
   
   for (const signal of signals) {
     const existingInsight = existingInsights.find(
       insight =>
         insight.status === 'active' &&
         insight.type === signal.type &&
-        signal.dataIds.some(id => insight.dataReferences.some(ref => ref.id === id))
+        signal.dataIds.some(id => insight.entityRefs.some(ref => ref.id === id))
     )
     
     if (!existingInsight) {
