@@ -91,6 +91,69 @@ This is a multi-module construction ERP system with project hierarchies, cost tr
 - **Progression**: Generate Metrics → Display Performance Radar → Cost/Schedule/Quality Analysis → Trend Charts
 - **Success criteria**: Real-time calculations, interactive charts, export capability, clear performance indicators
 
+### Submittal Tracking
+- **Functionality**: Manage all project submittals with status tracking, ball-in-court visibility, and aging analysis
+- **Purpose**: Ensure timely review and approval of submittals to prevent schedule delays
+- **Trigger**: User navigates to Submittals page, creates new submittal
+- **Progression**: Create Submittal → Assign Reviewer → Track Status → Days Outstanding Alert → Approval/Rejection
+- **Success criteria**: Full CRUD operations, status workflow, automatic days outstanding calculation, filtering by status/priority
+
+### Alerts & Notifications System
+- **Functionality**: Centralized alert dashboard for budget, schedule, RFI, submittal, delivery, and safety alerts
+- **Purpose**: Proactive notification of critical issues requiring attention
+- **Trigger**: System generates alerts based on thresholds, user views Alerts page
+- **Progression**: Alert Generated → Displayed by Severity → User Reviews → Take Action → Dismiss
+- **Success criteria**: Multi-severity alerts, action URLs, filtering, dismissal tracking, type categorization
+
+### To-Do List
+- **Functionality**: Task tracking with priority, category, assignment, and due dates
+- **Purpose**: Manage action items and follow-ups across all project areas
+- **Trigger**: User creates to-do from any context or manually adds task
+- **Progression**: Create Task → Assign → Set Due Date → Track Progress → Mark Complete
+- **Success criteria**: Full CRUD, status management, category filters, completion tracking
+
+### Production Notes
+- **Functionality**: Daily field notes with categorization, urgency flags, and follow-up tracking
+- **Purpose**: Capture critical field observations and issues in real-time
+- **Trigger**: Field staff creates note, optionally marks urgent or requires follow-up
+- **Progression**: Create Note → Categorize → Tag Location/Crew → Flag if Urgent → Set Follow-up
+- **Success criteria**: Category filtering, urgency indicators, tag system, shift tracking, follow-up dates
+
+### Fabrication Tracking
+- **Functionality**: Track fabrication items through detailing, material, production, and shipping stages
+- **Purpose**: Monitor shop production progress and identify bottlenecks
+- **Trigger**: User creates fabrication item, updates status/progress
+- **Progression**: Create Item → Detailing → Material Ordered/Received → Production → QC Checks → Completed → Shipped
+- **Success criteria**: Status workflow, progress bars for detailing and fabrication, weight/quantity tracking, QC checkpoints
+
+### Look-Ahead Planning
+- **Functionality**: Weekly planning with activities, constraints, materials, equipment, labor, and safety considerations
+- **Purpose**: Proactive coordination and resource planning for upcoming work
+- **Trigger**: User creates weekly look-ahead plan
+- **Progression**: Create Plan → Define Activities → Identify Constraints → List Resources → Safety Review → Publish → Complete
+- **Success criteria**: Week-based organization, constraint tracking, resource planning, safety checklist, status workflow
+
+### Project Contacts
+- **Functionality**: Centralized contact management organized by company with roles, email, phone, and notes
+- **Purpose**: Quick access to stakeholder contact information
+- **Trigger**: User adds contact from project setup or ad-hoc
+- **Progression**: Add Contact → Enter Details → Organize by Company → Edit/Update → Reference Throughout Project
+- **Success criteria**: Company grouping, full contact details, search/filter, edit/delete, integration with communication features
+
+### Job Setup Checklist
+- **Functionality**: Pre-construction checklist with categories, assignments, dependencies, and completion tracking
+- **Purpose**: Ensure all mobilization tasks are completed before work begins
+- **Purpose**: User creates checklist items, assigns responsibility, tracks completion
+- **Progression**: Define Setup Items → Categorize → Assign → Set Due Dates → Track Status → Mark Complete
+- **Success criteria**: Category organization, required vs optional items, status tracking, completion percentage, dependency awareness
+
+### In-Depth Financial Analysis
+- **Functionality**: Integrated analysis connecting Budget, SOV, Expenses, and Change Orders with visual dashboards
+- **Purpose**: Comprehensive financial health monitoring with cross-module data correlation
+- **Trigger**: Automatically calculated from budget, SOV, expense, and change order data
+- **Progression**: Data Collection → Calculate Metrics → Generate Charts → Identify Variances → Provide Insights
+- **Success criteria**: Budget vs Actual by cost code, SOV alignment with budget, cost distribution pie charts, cash flow analysis, change order impact visualization, all metrics accurately calculated and displayed
+
 ## Edge Case Handling
 
 - **Empty States**: All lists show helpful "no data" messages with CTAs to create first item
@@ -134,6 +197,103 @@ Typography should convey technical precision and readability under field conditi
 - Body (Data): Inter Regular / 15px / normal / 1.5
 - Small (Labels): Inter Medium / 13px / normal / 1.4
 - Data (Numbers): Inter Medium / 15px / tabular-nums / 1.5
+
+## Financial Integration & Data Flow
+
+All financial statistics are interconnected and populate dynamically across the application:
+
+### Core Financial Entities & Relationships
+
+1. **Cost Codes** → Foundation for all financial tracking
+   - Budgets link to cost codes
+   - SOV items map to cost codes
+   - Expenses categorize by cost codes
+   - Change orders impact cost codes
+
+2. **Budget System** → Central cost control
+   - `budgetedAmount`: Original planned cost
+   - `actualAmount`: Sum of approved/paid expenses for that cost code
+   - `committedAmount`: Contracts and POs not yet expensed
+   - `variance`: Auto-calculated as `budgetedAmount - actualAmount`
+   - Updates flow from Expenses → Budget.actualAmount
+
+3. **SOV (Schedule of Values)** → Billing and revenue tracking
+   - `scheduledValue`: Total value allocated to each line item (must align with budget)
+   - `workCompleted`: Current period work
+   - `materialsStored`: Materials on site
+   - `totalCompleted`: `workCompleted + materialsStored`
+   - `percentComplete`: `(totalCompleted / scheduledValue) * 100`
+   - `retainage`: Typically 10% held back
+   - `currentBilling`: `totalCompleted - previouslyBilled - retainage`
+   - SOV items link to cost codes via `costCodeId` or `SOVCostCodeMap` for allocation
+
+4. **Expenses** → Actual costs incurred
+   - Each expense categorized by cost code
+   - Status flow: `pending` → `approved` → `paid`
+   - Only `approved` and `paid` expenses roll into Budget.actualAmount
+   - Cash flow analysis uses expense dates for monthly aggregation
+
+5. **Change Orders** → Budget modifications
+   - Approved change orders add to total project budget
+   - Change order line items can map to specific cost codes
+   - Original Budget + Approved COs = Revised Budget
+   - Impact tracked in financial analysis charts
+
+### Data Calculation Flow
+
+```
+Expenses (approved/paid) 
+  ↓
+Budget.actualAmount (by cost code)
+  ↓
+Budget variance = budgetedAmount - actualAmount
+  ↓
+Financial Analysis Dashboard (Budget vs Actual)
+
+SOV Items (work completed)
+  ↓
+SOV percentComplete & currentBilling
+  ↓
+Cash Flow (income from billing)
+  ↓
+Financial Analysis Dashboard (SOV vs Budget alignment)
+
+Change Orders (approved)
+  ↓
+Revised Budget = Original Budget + CO Total
+  ↓
+Financial Analysis Dashboard (Change Order Impact)
+```
+
+### Cross-Module Integration Points
+
+- **Budget Tracking Page**: Shows forecasts based on Budget + Expenses + SOV progress
+- **SOV Tracking Page**: Can auto-generate from cost codes, validates against budget
+- **Financial Analysis Component**: Integrates all financial data into unified dashboards:
+  - Budget vs Actual by Cost Code (bar charts)
+  - SOV vs Budget Alignment (compares scheduled vs budget)
+  - Cost Breakdown by Category (pie chart from cost code categories)
+  - Monthly Cash Flow (SOV billing as income, Expenses as outflow)
+  - Change Order Impact (original vs revised budget visualization)
+  
+### Key Business Rules
+
+- Division-by-zero protection on all percentage calculations
+- SOV scheduled value should not exceed budget + approved change orders
+- Actual costs must be ≤ committed + budgeted
+- Retainage typically 10% but configurable per project
+- Budget health: `(budget - actual) / budget * 100`
+- Cost at completion: `actual + committed`
+- Projected variance: `(budget + change orders) - cost at completion`
+
+### Automated Calculations
+
+All financial metrics auto-update when underlying data changes:
+- Budget variance recalculated on expense approval
+- SOV percentages recalculated on work completion entry
+- Cash flow charts regenerate on new billing/expense
+- Financial health scores update in real-time
+- Forecasts regenerate using earned value methodology
 
 ## Animations
 

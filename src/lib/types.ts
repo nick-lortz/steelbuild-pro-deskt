@@ -623,3 +623,157 @@ export interface SOVCostCodeMap {
   allocatedPercent: number
   createdAt: string
 }
+
+export interface Submittal {
+  id: string
+  projectId: string
+  number: string
+  title: string
+  description?: string
+  specSection: string
+  type: 'shop-drawing' | 'product-data' | 'sample' | 'design-data' | 'test-report' | 'other'
+  status: 'draft' | 'submitted' | 'returned' | 'approved' | 'rejected' | 'approved-as-noted'
+  priority: 'low' | 'medium' | 'high' | 'critical'
+  submittedTo: string
+  submittedBy?: string
+  submittedDate?: string
+  requiredDate?: string
+  responseDate?: string
+  reviewedBy?: string
+  reviewComments?: string
+  ballInCourt: 'contractor' | 'architect' | 'engineer' | 'owner' | 'supplier'
+  daysOutstanding: number
+  relatedDrawings: string[]
+  relatedCostCodes: string[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface Alert {
+  id: string
+  projectId?: string
+  type: 'budget' | 'schedule' | 'rfi' | 'submittal' | 'delivery' | 'safety' | 'quality' | 'system'
+  severity: 'info' | 'warning' | 'critical'
+  title: string
+  message: string
+  entityType?: string
+  entityId?: string
+  actionRequired: boolean
+  actionUrl?: string
+  dismissed: boolean
+  dismissedBy?: string
+  dismissedAt?: string
+  createdAt: string
+  expiresAt?: string
+}
+
+export interface TodoItem {
+  id: string
+  projectId?: string
+  title: string
+  description?: string
+  priority: 'low' | 'medium' | 'high' | 'critical'
+  status: 'pending' | 'in-progress' | 'completed' | 'cancelled'
+  assignedTo?: string
+  dueDate?: string
+  completedDate?: string
+  category: 'admin' | 'technical' | 'procurement' | 'coordination' | 'submittal' | 'rfi' | 'other'
+  relatedEntity?: { type: string; id: string }
+  createdBy: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ProductionNote {
+  id: string
+  projectId: string
+  date: string
+  shift?: 'day' | 'night'
+  category: 'progress' | 'issue' | 'quality' | 'safety' | 'equipment' | 'material' | 'general'
+  title: string
+  content: string
+  location?: string
+  crew?: string
+  tags: string[]
+  attachments?: string[]
+  urgent: boolean
+  followUpRequired: boolean
+  followUpDate?: string
+  createdBy: string
+  createdAt: string
+}
+
+export interface Fabrication {
+  id: string
+  projectId: string
+  workPackageId?: string
+  pieceNumber: string
+  description: string
+  material: string
+  weight: number
+  quantity: number
+  status: 'not-started' | 'detailing' | 'material-ordered' | 'material-received' | 'in-production' | 'completed' | 'shipped'
+  detailingProgress: number
+  fabricationProgress: number
+  drawingNumber?: string
+  costCodeId?: string
+  startDate?: string
+  targetCompletionDate?: string
+  actualCompletionDate?: string
+  assignedTo?: string
+  notes?: string
+  qcChecks: Array<{ date: string; inspector: string; passed: boolean; notes?: string }>
+  createdAt: string
+  updatedAt: string
+}
+
+export interface LookAheadPlan {
+  id: string
+  projectId: string
+  weekNumber: number
+  year: number
+  weekStart: string
+  weekEnd: string
+  status: 'draft' | 'published' | 'completed'
+  plannedActivities: LookAheadActivity[]
+  constraints: string[]
+  materialRequirements: Array<{ description: string; quantity: number; requiredDate: string; status: string }>
+  equipmentNeeds: Array<{ equipment: string; quantity: number; dates: string[] }>
+  laborRequirements: Array<{ category: string; headcount: number; dates: string[] }>
+  safetyConsiderations: string[]
+  weatherForecast?: string
+  notes?: string
+  createdBy: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface LookAheadActivity {
+  id: string
+  description: string
+  location: string
+  crew?: string
+  estimatedDuration: number
+  dependencies: string[]
+  status: 'planned' | 'in-progress' | 'completed' | 'delayed'
+  progress: number
+  constraints?: string[]
+}
+
+export interface JobSetupItem {
+  id: string
+  projectId: string
+  category: 'contracts' | 'insurance' | 'permits' | 'submittals' | 'logistics' | 'safety' | 'qc' | 'coordination' | 'other'
+  description: string
+  required: boolean
+  status: 'not-started' | 'in-progress' | 'completed' | 'blocked'
+  assignedTo?: string
+  dueDate?: string
+  completedDate?: string
+  completedBy?: string
+  notes?: string
+  dependencies: string[]
+  order: number
+  createdAt: string
+  updatedAt: string
+}

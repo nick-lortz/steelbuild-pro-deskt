@@ -27,6 +27,14 @@ import { AuditDashboardPage } from '@/pages/audit/audit-dashboard-page'
 import { GlobalEquipmentPage } from '@/pages/global/equipment-page'
 import { GlobalCostCodesPage } from '@/pages/global/cost-codes-page'
 import { PortfolioPulsePage } from '@/pages/portfolio/portfolio-pulse-page'
+import { SubmittalsPage } from '@/pages/submittals/submittals-page'
+import { AlertsPage } from '@/pages/alerts/alerts-page'
+import { TodoListPage } from '@/pages/todo/todo-list-page'
+import { ProductionNotesPage } from '@/pages/production-notes/production-notes-page'
+import { FabricationTrackingPage } from '@/pages/fabrication/fabrication-tracking-page'
+import { LookAheadPlanningPage } from '@/pages/lookahead/lookahead-planning-page'
+import { ProjectContactsPage } from '@/pages/contacts/project-contacts-page'
+import { JobSetupPage } from '@/pages/job-setup/job-setup-page'
 
 export const router = createBrowserRouter([
   {
@@ -140,6 +148,38 @@ export const router = createBrowserRouter([
           {
             path: 'meetings',
             element: <MeetingsPage />,
+          },
+          {
+            path: 'submittals',
+            element: <SubmittalsPage />,
+          },
+          {
+            path: 'alerts',
+            element: <AlertsPage />,
+          },
+          {
+            path: 'todo',
+            element: <TodoListPage />,
+          },
+          {
+            path: 'production-notes',
+            element: <ProductionNotesPage />,
+          },
+          {
+            path: 'fabrication',
+            element: <FabricationTrackingPage />,
+          },
+          {
+            path: 'lookahead',
+            element: <LookAheadPlanningPage />,
+          },
+          {
+            path: 'contacts',
+            element: <ProjectContactsPage />,
+          },
+          {
+            path: 'job-setup',
+            element: <JobSetupPage />,
           },
         ],
       },

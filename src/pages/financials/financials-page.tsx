@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useKV } from '@github/spark/hooks'
 import { toast } from 'sonner'
+import { InDepthFinancialAnalysis } from '@/components/financials/in-depth-financial-analysis'
 import type { Budget, Expense, Invoice } from '@/lib/types'
 
 export function FinancialsPage() {
@@ -230,12 +231,18 @@ export function FinancialsPage() {
         </Card>
       </div>
 
-      <Tabs defaultValue="expenses" className="space-y-4">
+      <Tabs defaultValue="overview" className="space-y-4">
         <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="expenses">Expenses</TabsTrigger>
           <TabsTrigger value="budget">Budget</TabsTrigger>
           <TabsTrigger value="invoices">Invoices</TabsTrigger>
+          <TabsTrigger value="analysis">Financial Analysis</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="overview" className="space-y-4">
+          <InDepthFinancialAnalysis />
+        </TabsContent>
 
         <TabsContent value="expenses" className="space-y-4">
           <Card>
