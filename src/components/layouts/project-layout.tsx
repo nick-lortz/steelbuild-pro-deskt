@@ -19,16 +19,19 @@ import {
   TrendUp,
   ChartLine,
   ListChecks,
+  Robot,
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { projectsDb } from '@/lib/db'
+import { PMAPanel } from '@/components/pma/pma-panel'
 import type { Project } from '@/lib/types'
 
 export function ProjectLayout() {
   const { projectId } = useParams<{ projectId: string }>()
   const location = useLocation()
   const [project, setProject] = useState<Project | null>(null)
+  const [pmaOpen, setPmaOpen] = useState(false)
 
   useEffect(() => {
     const loadProject = async () => {
@@ -69,12 +72,18 @@ export function ProjectLayout() {
             </p>
           </div>
         </div>
-        <Link to={`/projects/${projectId}/settings`}>
-          <Button variant="outline" size="sm" className="gap-2">
-            <Gear size={18} />
-            Settings
+        <div className="flex items-center gap-2">
+          <Button variant="default" size="sm" className="gap-2" onClick={() => setPmaOpen(true)}>
+            <Robot size={18} />
+            PMA
           </Button>
-        </Link>
+          <Link to={`/projects/${projectId}/settings`}>
+            <Button variant="outline" size="sm" className="gap-2">
+              <Gear size={18} />
+              Settings
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <Tabs value={activeTab} className="space-y-6">
@@ -194,6 +203,8 @@ export function ProjectLayout() {
 
         <Outlet />
       </Tabs>
+
+      <PMAPanel open={pmaOpen} onOpenChange={setPmaOpen} projectId={projectId} />
     </div>
   )
 }
