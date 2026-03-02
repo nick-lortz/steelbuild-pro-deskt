@@ -4,6 +4,7 @@ import { Buildings, Robot, ChartBar, Wrench, CurrencyDollar, ClipboardText, Gear
 import { Button } from '@/components/ui/button'
 import { PMAPanel } from '@/components/pma/pma-panel'
 import { OfflineIndicator } from '@/components/shared/offline-indicator'
+import { PageTransition } from '@/components/shared/page-transition'
 
 export function MainLayout() {
   const [pmaOpen, setPmaOpen] = useState(false)
@@ -117,7 +118,9 @@ export function MainLayout() {
       </header>
 
       <main className="container px-6 py-8">
-        <Outlet />
+        <PageTransition>
+          <Outlet />
+        </PageTransition>
       </main>
 
       <PMAPanel open={pmaOpen} onOpenChange={setPmaOpen} />

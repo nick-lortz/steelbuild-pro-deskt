@@ -25,6 +25,7 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { projectsDb } from '@/lib/db'
 import { PMAPanel } from '@/components/pma/pma-panel'
+import { PageTransition } from '@/components/shared/page-transition'
 import type { Project } from '@/lib/types'
 
 export function ProjectLayout() {
@@ -201,7 +202,9 @@ export function ProjectLayout() {
           </Link>
         </div>
 
-        <Outlet />
+        <PageTransition>
+          <Outlet />
+        </PageTransition>
       </Tabs>
 
       <PMAPanel open={pmaOpen} onOpenChange={setPmaOpen} projectId={projectId} />
