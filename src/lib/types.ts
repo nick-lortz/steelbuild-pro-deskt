@@ -145,3 +145,209 @@ export interface ChecklistItem {
   notes?: string
   order: number
 }
+
+export interface Task {
+  id: string
+  projectId: string
+  name: string
+  description?: string
+  status: 'not-started' | 'in-progress' | 'completed' | 'blocked'
+  priority: 'low' | 'medium' | 'high' | 'critical'
+  startDate: string
+  endDate: string
+  dependencies: string[]
+  assignedTo?: string
+  percentComplete: number
+  isCriticalPath: boolean
+  createdAt: string
+}
+
+export interface Budget {
+  id: string
+  projectId: string
+  costCodeId: string
+  budgetedAmount: number
+  actualAmount: number
+  committedAmount: number
+  variance: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface Invoice {
+  id: string
+  projectId: string
+  invoiceNumber: string
+  invoiceDate: string
+  dueDate: string
+  amount: number
+  paidAmount: number
+  status: 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled'
+  lineItems: InvoiceLineItem[]
+  createdAt: string
+}
+
+export interface InvoiceLineItem {
+  id: string
+  description: string
+  quantity: number
+  rate: number
+  amount: number
+}
+
+export interface RFI {
+  id: string
+  projectId: string
+  number: string
+  subject: string
+  question: string
+  answer?: string
+  status: 'open' | 'answered' | 'closed' | 'escalated'
+  priority: 'low' | 'medium' | 'high' | 'critical'
+  submittedBy: string
+  submittedDate: string
+  answeredBy?: string
+  answeredDate?: string
+  escalatedDate?: string
+  dueDate?: string
+  createdAt: string
+}
+
+export interface Document {
+  id: string
+  projectId: string
+  name: string
+  type: 'contract' | 'drawing' | 'specification' | 'photo' | 'report' | 'other'
+  category: string
+  url?: string
+  size: number
+  uploadedBy: string
+  uploadedDate: string
+  tags: string[]
+  createdAt: string
+}
+
+export interface WorkPackage {
+  id: string
+  projectId: string
+  packageNumber: string
+  title: string
+  type: 'fabrication' | 'erection'
+  status: 'planning' | 'ready' | 'in-progress' | 'completed'
+  startDate?: string
+  completionDate?: string
+  assignedCrew?: string
+  drawings: string[]
+  materials: string[]
+  createdAt: string
+}
+
+export interface Delivery {
+  id: string
+  projectId: string
+  deliveryNumber: string
+  description: string
+  supplier: string
+  expectedDate: string
+  actualDate?: string
+  status: 'scheduled' | 'in-transit' | 'delivered' | 'delayed' | 'cancelled'
+  trackingNumber?: string
+  items: DeliveryItem[]
+  notes?: string
+  createdAt: string
+}
+
+export interface DeliveryItem {
+  id: string
+  description: string
+  quantity: number
+  unit: string
+  received: number
+}
+
+export interface LaborCategory {
+  id: string
+  name: string
+  code: string
+  baseRate: number
+  overtimeRate: number
+  createdAt: string
+}
+
+export interface LaborEntry {
+  id: string
+  projectId: string
+  categoryId: string
+  employeeName: string
+  date: string
+  regularHours: number
+  overtimeHours: number
+  totalHours: number
+  costCodeId?: string
+  description?: string
+  createdAt: string
+}
+
+export interface EquipmentLog {
+  id: string
+  equipmentId: string
+  projectId?: string
+  date: string
+  type: 'usage' | 'maintenance' | 'inspection' | 'repair'
+  hours?: number
+  description: string
+  cost?: number
+  performedBy: string
+  createdAt: string
+}
+
+export interface DailyLog {
+  id: string
+  projectId: string
+  date: string
+  weather: string
+  temperature?: number
+  crew: Array<{ name: string; hours: number }>
+  workPerformed: string
+  issues?: string
+  safetyNotes?: string
+  visitors?: string[]
+  deliveries?: string[]
+  photos?: string[]
+  createdBy: string
+  createdAt: string
+}
+
+export interface Meeting {
+  id: string
+  projectId: string
+  title: string
+  type: 'coordination' | 'safety' | 'progress' | 'client' | 'other'
+  date: string
+  location?: string
+  attendees: string[]
+  agenda?: string
+  notes: string
+  actionItems: MeetingActionItem[]
+  createdBy: string
+  createdAt: string
+}
+
+export interface MeetingActionItem {
+  id: string
+  description: string
+  assignedTo: string
+  dueDate?: string
+  completed: boolean
+}
+
+export interface AuditEntry {
+  id: string
+  entityType: string
+  entityId: string
+  action: 'create' | 'update' | 'delete'
+  userId: string
+  timestamp: string
+  changes: Record<string, { old: unknown; new: unknown }>
+  projectId?: string
+}
