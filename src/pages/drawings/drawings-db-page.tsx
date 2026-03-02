@@ -70,11 +70,14 @@ export function DrawingsDBPage() {
   
   const [isCreateSetOpen, setIsCreateSetOpen] = useState(false)
   const [isAddSheetOpen, setIsAddSheetOpen] = useState(false)
+  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false)
   const [selectedSet, setSelectedSet] = useState<DrawingSet | null>(null)
   const [viewSheetsSetId, setViewSheetsSetId] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [uploadingFile, setUploadingFile] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const bulkFileInputRef = useRef<HTMLInputElement>(null)
 
   const [setFormData, setSetFormData] = useState({
     name: '',
@@ -196,6 +199,99 @@ export function DrawingsDBPage() {
       }
       setSelectedFile(file)
       toast.success(`Selected: ${file.name}`)
+    }
+  }
+
+  const handleBulkFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+
+    const pdfFiles = files.filter(file => file.name.toLowerCase().endsWith('.pdf'))
+    const invalidFiles = files.length - pdfFiles.length
+
+    if (invalidFiles > 0) {
+      toast.error(`${invalidFiles} non-PDF file(s) skipped`)
+    }
+
+    if (pdfFiles.length > 0) {
+      setSelectedFiles(pdfFiles)
+      toast.success(`Selected ${pdfFiles.length} PDF file(s)`)
+    }
+  }
+
+  const handleRemoveBulkFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const extractSheetNumber = (filename: string): string => {
+    const cleaned = filename.replace(/\.pdf$/i, '')
+    const match = cleaned.match(/[A-Z]-?\d+/i)
+    return match ? match[0] : cleaned
+  }
+
+  const extractSheetTitle = (filename: string): string => {
+    const cleaned = filename.replace(/\.pdf$/i, '')
+    const withoutNumber = cleaned.replace(/^[A-Z]-?\d+[_\s-]*/i, '')
+    return withoutNumber || cleaned
+  }
+
+  const handleBulkUpload = async () => {
+    if (!selectedSet) {
+      toast.error('No drawing set selected')
+      return
+    }
+
+    if (selectedFiles.length === 0) {
+      toast.error('Please select at least one PDF file')
+      return
+    }
+
+    setUploadingFile(true)
+
+    try {
+      const newSheets: DrawingSheet[] = []
+
+      for (const file of selectedFiles) {
+        const base64Data = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = (e) => {
+            if (e.target?.result) {
+              const base64 = btoa(
+                new Uint8Array(e.target.result as ArrayBuffer)
+                  .reduce((data, byte) => data + String.fromCharCode(byte), '')
+              )
+              resolve(base64)
+            } else {
+              reject(new Error('Failed to read file'))
+            }
+          }
+          reader.onerror = () => reject(new Error('Failed to read file'))
+          reader.readAsArrayBuffer(file)
+        })
+
+        const newSheet: DrawingSheet = {
+          id: crypto.randomUUID(),
+          set_id: selectedSet.id,
+          sheet_no: extractSheetNumber(file.name),
+          title: extractSheetTitle(file.name),
+          status: sheetFormData.status,
+          file_name: file.name,
+          file_data: base64Data,
+          created_at: new Date().toISOString(),
+        }
+
+        newSheets.push(newSheet)
+      }
+
+      setDrawingSheets((current) => [...current, ...newSheets])
+      setIsBulkUploadOpen(false)
+      setSelectedSet(null)
+      setSelectedFiles([])
+      setUploadingFile(false)
+      toast.success(`Successfully uploaded ${newSheets.length} sheet(s)`)
+    } catch (error) {
+      setUploadingFile(false)
+      toast.error('Failed to upload files')
     }
   }
 
@@ -472,6 +568,17 @@ export function DrawingsDBPage() {
                               </Button>
                               <Button
                                 size="sm"
+                                variant="default"
+                                onClick={() => {
+                                  setSelectedSet(set)
+                                  setIsBulkUploadOpen(true)
+                                }}
+                              >
+                                <Stack size={14} className="mr-1" />
+                                Bulk Upload
+                              </Button>
+                              <Button
+                                size="sm"
                                 variant="ghost"
                                 onClick={() => handleDeleteSet(set.id)}
                               >
@@ -673,6 +780,115 @@ export function DrawingsDBPage() {
             </Button>
             <Button onClick={handleAddSheet} disabled={uploadingFile}>
               {uploadingFile ? 'Uploading...' : 'Add Sheet'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isBulkUploadOpen} onOpenChange={setIsBulkUploadOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle>Bulk Upload Drawing Sheets</DialogTitle>
+            <DialogDescription>
+              Upload multiple PDF files to {selectedSet?.name}. Sheet numbers and titles will be auto-extracted from filenames.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="bulk-status">Initial Status for All Sheets</Label>
+              <Select 
+                value={sheetFormData.status} 
+                onValueChange={(value: DrawingSetStatus) => setSheetFormData({ ...sheetFormData, status: value })}
+              >
+                <SelectTrigger id="bulk-status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_SEQUENCE.map(status => (
+                    <SelectItem key={status} value={status}>
+                      {status} - {STATUS_LABELS[status]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="bulk-pdf-upload">Select PDF Files *</Label>
+              <Input
+                id="bulk-pdf-upload"
+                ref={bulkFileInputRef}
+                type="file"
+                accept=".pdf,application/pdf"
+                multiple
+                onChange={handleBulkFileSelect}
+                className="cursor-pointer"
+              />
+              <p className="text-xs text-muted-foreground">
+                Select multiple PDF files. Filenames should include sheet numbers (e.g., S-101, A-203).
+              </p>
+            </div>
+            
+            {selectedFiles.length > 0 && (
+              <div className="grid gap-2">
+                <Label>Selected Files ({selectedFiles.length})</Label>
+                <div className="border rounded-md max-h-[300px] overflow-y-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[120px]">Sheet No.</TableHead>
+                        <TableHead>Title</TableHead>
+                        <TableHead className="w-[200px]">File</TableHead>
+                        <TableHead className="w-[50px]"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {selectedFiles.map((file, index) => (
+                        <TableRow key={index}>
+                          <TableCell className="font-mono text-sm">
+                            {extractSheetNumber(file.name)}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {extractSheetTitle(file.name)}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground truncate">
+                            <Badge variant="outline" className="flex items-center gap-1 w-fit">
+                              <FilePdf size={12} />
+                              {file.name}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleRemoveBulkFile(index)}
+                            >
+                              <X size={14} />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setIsBulkUploadOpen(false)
+                setSelectedFiles([])
+              }}
+              disabled={uploadingFile}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleBulkUpload} 
+              disabled={uploadingFile || selectedFiles.length === 0}
+            >
+              {uploadingFile ? `Uploading ${selectedFiles.length} file(s)...` : `Upload ${selectedFiles.length} Sheet(s)`}
             </Button>
           </div>
         </DialogContent>
