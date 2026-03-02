@@ -47,6 +47,7 @@ const {
   deleteContract,
   calculateAutomatedSOV,
   recalculateProjectBudget,
+  recalculateProjectTotals,
   getProjectFinancialSummary,
   updateProjectContractValue,
 } = require("./db/queries");
@@ -816,6 +817,14 @@ ipcMain.handle("db:calculateAutomatedSOV", async (event, projectId) => {
 ipcMain.handle("db:recalculateProjectBudget", async (event, projectId) => {
   try {
     return await recalculateProjectBudget(projectId);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:recalculateProjectTotals", async (event, projectId) => {
+  try {
+    return await recalculateProjectTotals(projectId);
   } catch (error) {
     return { success: false, error: error.message };
   }

@@ -32,6 +32,7 @@ const fallbackDB = {
   deleteContract: async () => ({ success: false, error: 'Not running in desktop mode' }),
   calculateAutomatedSOV: async () => ({ success: false, data: [] }),
   recalculateProjectBudget: async () => ({ success: false, error: 'Not running in desktop mode' }),
+  recalculateProjectTotals: async () => ({ success: false, error: 'Not running in desktop mode' }),
   getProjectFinancialSummary: async () => ({ success: false, error: 'Not running in desktop mode' }),
   updateProjectContractValue: async () => ({ success: false, error: 'Not running in desktop mode' }),
   createDrawingSet: async () => ({ success: false, error: 'Not running in desktop mode' }),

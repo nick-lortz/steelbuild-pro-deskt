@@ -1552,6 +1552,83 @@ async function updateProjectContractValue(projectId, originalValue) {
   return { success: true };
 }
 
+async function recalculateProjectTotals(projectId) {
+  const sqliteDb = getSQLiteDB();
+  const db = getDatabase();
+  
+  const project = sqliteDb.prepare(`
+    SELECT original_contract_value, current_contract_value FROM projects WHERE id = ?
+  `).get(projectId);
+  
+  if (!project) {
+    return { success: false, error: 'Project not found' };
+  }
+  
+  const approvedCOs = sqliteDb.prepare(`
+    SELECT SUM(total) as co_total 
+    FROM change_orders 
+    WHERE project_id = ? AND status = 'approved' AND deleted_at IS NULL
+  `).get(projectId);
+  
+  const coTotal = approvedCOs?.co_total || 0;
+  
+  const costCodeActuals = db
+    .select({
+      totalActual: sql`COALESCE(SUM(${cost_codes.actual_amount}), 0)`,
+    })
+    .from(cost_codes)
+    .where(and(
+      eq(cost_codes.project_id, projectId),
+      isNull(cost_codes.deleted_at)
+    ))
+    .get();
+  
+  const totalActual = Number(costCodeActuals?.totalActual || 0);
+  
+  const newContractValue = (project.original_contract_value || 0) + coTotal;
+  const marginAtRisk = newContractValue - totalActual;
+  const marginPercent = newContractValue > 0 ? ((marginAtRisk / newContractValue) * 100) : 0;
+  
+  sqliteDb.prepare(`
+    UPDATE projects 
+    SET 
+      current_contract_value = ?,
+      total_actual_cost = ?,
+      margin_at_risk = ?,
+      margin_percent = ?,
+      updated_at = ?
+    WHERE id = ?
+  `).run(
+    newContractValue, 
+    totalActual, 
+    marginAtRisk, 
+    marginPercent,
+    new Date().toISOString(), 
+    projectId
+  );
+  
+  logAudit('project', projectId, 'totals-recalculation', projectId, {
+    original_contract_value: project.original_contract_value,
+    approved_co_total: coTotal,
+    new_contract_value: newContractValue,
+    total_actual_cost: totalActual,
+    margin_at_risk: marginAtRisk,
+    margin_percent: marginPercent
+  });
+  
+  return { 
+    success: true, 
+    data: {
+      original_contract_value: project.original_contract_value,
+      approved_change_orders: coTotal,
+      current_contract_value: newContractValue,
+      total_actual_cost: totalActual,
+      margin_at_risk: marginAtRisk,
+      margin_percent: marginPercent
+    }
+  };
+}
+
 module.exports = {
   createRFI,
   listRFIs,
@@ -1597,6 +1674,7 @@ module.exports = {
   deleteContract,
   calculateAutomatedSOV,
   recalculateProjectBudget,
+  recalculateProjectTotals,
   getProjectFinancialSummary,
   updateProjectContractValue,
 };
