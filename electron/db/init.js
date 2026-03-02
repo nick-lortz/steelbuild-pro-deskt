@@ -68,6 +68,10 @@ function createTablesIfNotExists() {
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
       UNIQUE(project_id, rfi_number)
     );
+    
+    CREATE INDEX IF NOT EXISTS idx_rfis_project ON rfis(project_id);
+    CREATE INDEX IF NOT EXISTS idx_rfis_status ON rfis(status);
+    CREATE INDEX IF NOT EXISTS idx_rfis_created ON rfis(created_at);
 
     CREATE TABLE IF NOT EXISTS equipment (
       id TEXT PRIMARY KEY,
@@ -95,6 +99,7 @@ function createTablesIfNotExists() {
       actual_amount REAL NOT NULL DEFAULT 0,
       status TEXT NOT NULL DEFAULT 'active',
       category TEXT,
+      task_id TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       created_by TEXT,
@@ -103,6 +108,9 @@ function createTablesIfNotExists() {
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
       UNIQUE(project_id, code)
     );
+    
+    CREATE INDEX IF NOT EXISTS idx_cost_codes_project ON cost_codes(project_id);
+    CREATE INDEX IF NOT EXISTS idx_cost_codes_code ON cost_codes(project_id, code);
 
     CREATE TABLE IF NOT EXISTS tasks (
       id TEXT PRIMARY KEY,
@@ -169,6 +177,9 @@ function createTablesIfNotExists() {
       deleted_at TEXT,
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
     );
+    
+    CREATE INDEX IF NOT EXISTS idx_drawing_sets_project ON drawing_sets(project_id);
+    CREATE INDEX IF NOT EXISTS idx_drawing_sets_status ON drawing_sets(status);
 
     CREATE TABLE IF NOT EXISTS drawing_sheets (
       id TEXT PRIMARY KEY,
@@ -176,14 +187,19 @@ function createTablesIfNotExists() {
       sheet_no TEXT NOT NULL,
       title TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'IFA',
+      revision TEXT DEFAULT 'A',
       file_key TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       created_by TEXT,
       updated_by TEXT,
       deleted_at TEXT,
-      FOREIGN KEY (set_id) REFERENCES drawing_sets(id) ON DELETE CASCADE
+      FOREIGN KEY (set_id) REFERENCES drawing_sets(id) ON DELETE CASCADE,
+      UNIQUE(set_id, sheet_no, revision)
     );
+    
+    CREATE INDEX IF NOT EXISTS idx_drawing_sheets_set ON drawing_sheets(set_id);
+    CREATE INDEX IF NOT EXISTS idx_drawing_sheets_status ON drawing_sheets(status);
 
     CREATE TABLE IF NOT EXISTS notifications (
       id TEXT PRIMARY KEY,
