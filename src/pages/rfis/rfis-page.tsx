@@ -155,10 +155,10 @@ export function RFIsPage() {
   const escalatedRFIs = rfis?.filter(r => r.status === 'escalated').length || 0
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">RFIs</h2>
+          <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">RFIs</h2>
           <p className="text-muted-foreground">Request for Information management</p>
         </div>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
@@ -323,10 +323,12 @@ export function RFIsPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
-        <Card>
+        <Card className="overflow-hidden hover:shadow-md transition-all duration-200 border-border/50 bg-gradient-to-br from-card to-card/50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Open RFIs</CardTitle>
-            <Question size={20} className="text-muted-foreground" />
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <Question size={20} className="text-primary" weight="duotone" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{openRFIs}</div>
@@ -336,10 +338,12 @@ export function RFIsPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="overflow-hidden hover:shadow-md transition-all duration-200 border-border/50 bg-gradient-to-br from-card to-card/50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Answered</CardTitle>
-            <CheckCircle size={20} className="text-accent" />
+            <div className="p-2 bg-accent/10 rounded-lg">
+              <CheckCircle size={20} className="text-accent" weight="duotone" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{answeredRFIs}</div>
@@ -349,10 +353,12 @@ export function RFIsPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="overflow-hidden hover:shadow-md transition-all duration-200 border-border/50 bg-gradient-to-br from-card to-card/50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Escalated</CardTitle>
-            <Warning size={20} className="text-destructive" />
+            <div className="p-2 bg-destructive/10 rounded-lg">
+              <Warning size={20} className="text-destructive" weight="duotone" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{escalatedRFIs}</div>

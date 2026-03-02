@@ -191,10 +191,10 @@ export function LaborPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Labor</h2>
+          <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">Labor</h2>
           <p className="text-muted-foreground">Track labor hours and costs</p>
         </div>
         <div className="flex gap-2">
@@ -358,10 +358,12 @@ export function LaborPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
+        <Card className="overflow-hidden hover:shadow-md transition-all duration-200 border-border/50 bg-gradient-to-br from-card to-card/50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Hours</CardTitle>
-            <Clock className="text-muted-foreground" />
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <Clock className="text-primary" weight="duotone" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{totalHours.toFixed(1)}</div>
@@ -370,10 +372,12 @@ export function LaborPage() {
             </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="overflow-hidden hover:shadow-md transition-all duration-200 border-border/50 bg-gradient-to-br from-card to-card/50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Regular Hours</CardTitle>
-            <CalendarBlank className="text-muted-foreground" />
+            <div className="p-2 bg-accent/10 rounded-lg">
+              <CalendarBlank className="text-accent" weight="duotone" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{totalRegularHours.toFixed(1)}</div>
@@ -382,10 +386,12 @@ export function LaborPage() {
             </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="overflow-hidden hover:shadow-md transition-all duration-200 border-border/50 bg-gradient-to-br from-card to-card/50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Overtime Hours</CardTitle>
-            <Clock className="text-muted-foreground" />
+            <div className="p-2 bg-warning/10 rounded-lg">
+              <Clock className="text-warning" weight="duotone" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{totalOvertimeHours.toFixed(1)}</div>
@@ -394,10 +400,12 @@ export function LaborPage() {
             </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="overflow-hidden hover:shadow-md transition-all duration-200 border-border/50 bg-gradient-to-br from-card to-card/50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Cost</CardTitle>
-            <CurrencyDollar className="text-muted-foreground" />
+            <div className="p-2 bg-accent/10 rounded-lg">
+              <CurrencyDollar className="text-accent" weight="duotone" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">${totalCost.toFixed(2)}</div>

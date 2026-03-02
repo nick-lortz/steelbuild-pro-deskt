@@ -123,10 +123,10 @@ export function CostCodesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Cost Codes</h2>
+          <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">Cost Codes</h2>
           <p className="text-muted-foreground">Manage project cost codes and budgets</p>
         </div>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
@@ -195,30 +195,36 @@ export function CostCodesPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
+        <Card className="overflow-hidden hover:shadow-md transition-all duration-200 border-border/50 bg-gradient-to-br from-card to-card/50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Cost Codes</CardTitle>
-            <Tag className="text-muted-foreground" />
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <Tag className="text-primary" weight="duotone" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{costCodes?.length || 0}</div>
             <p className="text-xs text-muted-foreground">Active codes</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="overflow-hidden hover:shadow-md transition-all duration-200 border-border/50 bg-gradient-to-br from-card to-card/50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Budget</CardTitle>
-            <Tag className="text-muted-foreground" />
+            <div className="p-2 bg-accent/10 rounded-lg">
+              <Tag className="text-accent" weight="duotone" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">${totalBudget.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">Budgeted</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="overflow-hidden hover:shadow-md transition-all duration-200 border-border/50 bg-gradient-to-br from-card to-card/50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Actual</CardTitle>
-            <Tag className="text-muted-foreground" />
+            <div className="p-2 bg-warning/10 rounded-lg">
+              <Tag className="text-warning" weight="duotone" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">${totalActual.toLocaleString()}</div>
