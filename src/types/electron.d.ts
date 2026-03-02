@@ -178,6 +178,78 @@ export interface Contract {
   deleted_at?: string;
 }
 
+export interface ProductionNoteBlocker {
+  id: string;
+  waiting_on_party: string;
+  description: string;
+  created_at: string;
+}
+
+export interface ProductionNoteAttachment {
+  id: string;
+  file_name: string;
+  file_key: string;
+  file_size: number;
+  uploaded_at: string;
+  uploaded_by: string;
+}
+
+export interface ProductionNoteComment {
+  id: string;
+  note_id: string;
+  body: string;
+  created_at: string;
+  created_by: string;
+  created_by_name?: string;
+  mentions?: string[];
+}
+
+export interface ProductionNoteAuditEntry {
+  id: string;
+  action: string;
+  field_changed?: string;
+  old_value?: string;
+  new_value?: string;
+  changed_by: string;
+  changed_by_name?: string;
+  changed_at: string;
+}
+
+export interface ProductionNote {
+  id: string;
+  project_id: string;
+  title: string;
+  body: string;
+  status: 'open' | 'in_progress' | 'waiting_on' | 'resolved' | 'closed';
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  category: 'fab' | 'field' | 'detailing' | 'qc' | 'safety' | 'coordination' | 'delivery' | 'design_intent';
+  discipline: 'structural' | 'misc_metals' | 'stairs' | 'rails' | 'other';
+  assignee?: string;
+  assignee_name?: string;
+  created_by: string;
+  created_by_name?: string;
+  created_at: string;
+  updated_at: string;
+  due_date?: string;
+  blocked: boolean;
+  blockers: ProductionNoteBlocker[];
+  work_package_id?: string;
+  drawing_set_id?: string;
+  drawing_sheet_id?: string;
+  rfi_id?: string;
+  change_order_id?: string;
+  piece_mark?: string;
+  tags: string[];
+  attachments: ProductionNoteAttachment[];
+  visibility: 'internal' | 'shared_with_gc';
+  resolution_summary?: string;
+  resolved_at?: string;
+  resolved_by?: string;
+  deleted_at?: string;
+  comments?: ProductionNoteComment[];
+  audit_log?: ProductionNoteAuditEntry[];
+}
+
 export interface DashboardCounts {
   rfi_count: number;
   equipment_count: number;
@@ -297,6 +369,30 @@ export interface SBPDB {
   recalculateProjectBudget: (projectId: string) => Promise<DBResult<BudgetRecalculationResult>>;
   getProjectFinancialSummary: (projectId: string) => Promise<DBResult<ProjectFinancialSummary>>;
   updateProjectContractValue: (projectId: string, originalValue: number) => Promise<DBResult>;
+  createProductionNote: (data: Partial<ProductionNote>) => Promise<DBResult<ProductionNote>>;
+  listProductionNotes: (projectId: string, options?: {
+    status?: string;
+    priority?: string;
+    category?: string;
+    discipline?: string;
+    assignee?: string;
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }) => Promise<DBResult<ProductionNote[]>>;
+  updateProductionNote: (id: string, data: Partial<ProductionNote>) => Promise<DBResult>;
+  deleteProductionNote: (id: string, userId?: string) => Promise<DBResult>;
+  restoreProductionNote: (id: string, userId?: string) => Promise<DBResult>;
+  addProductionNoteComment: (noteId: string, body: string, userId: string, mentions?: string[]) => Promise<DBResult<ProductionNoteComment>>;
+  listProductionNoteComments: (noteId: string) => Promise<DBResult<ProductionNoteComment[]>>;
+  getProductionNoteKPIs: (projectId: string) => Promise<DBResult<{
+    open_notes: number;
+    past_due: number;
+    high_critical: number;
+    blockers: number;
+    by_category: Record<string, number>;
+  }>>;
+  convertProductionNoteToRFI: (noteId: string, userId: string) => Promise<DBResult<RFI>>;
 }
 
 declare global {

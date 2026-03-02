@@ -1,11 +1,12 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
-import { useKV } from '@github/spark/hooks'
+import { useProductionNotes, useProductionNoteKPIs } from '@/hooks/use-production-notes'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
 import { 
   Plus, 
   FunnelSimple, 
@@ -16,14 +17,14 @@ import {
   Hourglass,
   XCircle
 } from '@phosphor-icons/react'
-import type { ProductionNote } from '@/lib/types'
+import type { ProductionNote } from '@/types/electron'
 import { CreateNoteDialog } from './create-note-dialog'
 import { NoteDetailPanel } from './note-detail-panel'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 
 export function ProductionNotesDashboard() {
   const { projectId } = useParams<{ projectId: string }>()
-  const [notes, setNotes] = useKV<ProductionNote[]>('production-notes-v2', [])
   const [selectedNote, setSelectedNote] = useState<ProductionNote | null>(null)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   
@@ -34,42 +35,23 @@ export function ProductionNotesDashboard() {
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [sortBy, setSortBy] = useState<'newest' | 'priority' | 'status' | 'dueDate' | 'lastUpdated'>('newest')
 
-  const projectNotes = useMemo(() => {
-    return notes.filter(n => n.projectId === projectId)
-  }, [notes, projectId])
+  const filters = useMemo(() => ({
+    status: statusFilter !== 'all' ? statusFilter : undefined,
+    priority: priorityFilter !== 'all' ? priorityFilter : undefined,
+    discipline: disciplineFilter !== 'all' ? disciplineFilter : undefined,
+    category: categoryFilter !== 'all' ? categoryFilter : undefined,
+    search: searchQuery || undefined,
+  }), [searchQuery, statusFilter, priorityFilter, disciplineFilter, categoryFilter])
 
-  const filteredNotes = useMemo(() => {
-    let filtered = projectNotes
+  const { notes, loading: notesLoading, createNote, updateNote, deleteNote, reload } = useProductionNotes(projectId, filters)
+  const { kpis, loading: kpisLoading } = useProductionNoteKPIs(projectId)
 
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase()
-      filtered = filtered.filter(note =>
-        note.title.toLowerCase().includes(query) ||
-        note.body.toLowerCase().includes(query) ||
-        note.tags.some(tag => tag.toLowerCase().includes(query))
-      )
-    }
-
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(note => note.status === statusFilter)
-    }
-
-    if (priorityFilter !== 'all') {
-      filtered = filtered.filter(note => note.priority === priorityFilter)
-    }
-
-    if (disciplineFilter !== 'all') {
-      filtered = filtered.filter(note => note.discipline === disciplineFilter)
-    }
-
-    if (categoryFilter !== 'all') {
-      filtered = filtered.filter(note => note.category === categoryFilter)
-    }
-
-    filtered.sort((a, b) => {
+  const sortedNotes = useMemo(() => {
+    const sorted = [...notes]
+    sorted.sort((a, b) => {
       switch (sortBy) {
         case 'newest':
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         case 'priority':
           const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 }
           return priorityOrder[a.priority] - priorityOrder[b.priority]
@@ -77,76 +59,57 @@ export function ProductionNotesDashboard() {
           const statusOrder = { open: 0, in_progress: 1, waiting_on: 2, resolved: 3, closed: 4 }
           return statusOrder[a.status] - statusOrder[b.status]
         case 'dueDate':
-          if (!a.dueDate && !b.dueDate) return 0
-          if (!a.dueDate) return 1
-          if (!b.dueDate) return -1
-          return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
+          if (!a.due_date && !b.due_date) return 0
+          if (!a.due_date) return 1
+          if (!b.due_date) return -1
+          return new Date(a.due_date).getTime() - new Date(b.due_date).getTime()
         case 'lastUpdated':
-          return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+          return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
         default:
           return 0
       }
     })
+    return sorted
+  }, [notes, sortBy])
 
-    return filtered
-  }, [projectNotes, searchQuery, statusFilter, priorityFilter, disciplineFilter, categoryFilter, sortBy])
-
-  const kpis = useMemo(() => {
-    const open = projectNotes.filter(n => n.status === 'open' || n.status === 'in_progress').length
-    const pastDue = projectNotes.filter(n => 
-      n.dueDate && new Date(n.dueDate) < new Date() && n.status !== 'resolved' && n.status !== 'closed'
-    ).length
-    const highCritical = projectNotes.filter(n => 
-      (n.priority === 'high' || n.priority === 'critical') && n.status !== 'resolved' && n.status !== 'closed'
-    ).length
-    const blockers = projectNotes.filter(n => n.blocked).length
-
-    const byCategory = projectNotes.reduce((acc, note) => {
-      if (note.status !== 'resolved' && note.status !== 'closed') {
-        acc[note.category] = (acc[note.category] || 0) + 1
+  useEffect(() => {
+    if (selectedNote) {
+      const updatedNote = notes.find(n => n.id === selectedNote.id)
+      if (updatedNote) {
+        setSelectedNote(updatedNote)
+      } else {
+        setSelectedNote(null)
       }
-      return acc
-    }, {} as Record<string, number>)
-
-    return { open, pastDue, highCritical, blockers, byCategory }
-  }, [projectNotes])
-
-  const handleCreateNote = (noteData: Partial<ProductionNote>) => {
-    const newNote: ProductionNote = {
-      id: crypto.randomUUID(),
-      projectId: projectId!,
-      title: noteData.title!,
-      body: noteData.body!,
-      status: noteData.status || 'open',
-      priority: noteData.priority || 'medium',
-      category: noteData.category || 'general' as any,
-      discipline: noteData.discipline || 'structural',
-      assignee: noteData.assignee,
-      createdBy: 'current-user',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      dueDate: noteData.dueDate,
-      blocked: false,
-      blockers: [],
-      tags: noteData.tags || [],
-      attachments: [],
-      visibility: noteData.visibility || 'internal',
     }
+  }, [notes, selectedNote])
 
-    setNotes(current => [...current, newNote])
-    setIsCreateDialogOpen(false)
+  const handleCreateNote = async (noteData: Partial<ProductionNote>) => {
+    const result = await createNote(noteData)
+    if (result.success) {
+      setIsCreateDialogOpen(false)
+      toast.success('Note created successfully')
+    } else {
+      toast.error(result.error || 'Failed to create note')
+    }
   }
 
-  const handleUpdateNote = (updatedNote: ProductionNote) => {
-    setNotes(current => 
-      current.map(n => n.id === updatedNote.id ? { ...updatedNote, updatedAt: new Date().toISOString() } : n)
-    )
-    setSelectedNote(updatedNote)
+  const handleUpdateNote = async (updatedNote: ProductionNote) => {
+    const result = await updateNote(updatedNote.id, updatedNote)
+    if (result.success) {
+      toast.success('Note updated successfully')
+    } else {
+      toast.error(result.error || 'Failed to update note')
+    }
   }
 
-  const handleDeleteNote = (noteId: string) => {
-    setNotes(current => current.filter(n => n.id !== noteId))
-    setSelectedNote(null)
+  const handleDeleteNote = async (noteId: string) => {
+    const result = await deleteNote(noteId, 'current-user')
+    if (result.success) {
+      setSelectedNote(null)
+      toast.success('Note deleted successfully')
+    } else {
+      toast.error(result.error || 'Failed to delete note')
+    }
   }
 
   const getPriorityColor = (priority: string) => {
@@ -170,6 +133,14 @@ export function ProductionNotesDashboard() {
     }
   }
 
+  if (!projectId) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-muted-foreground">Please select a project</p>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -189,7 +160,11 @@ export function ProductionNotesDashboard() {
             <CardTitle className="text-sm font-medium">Open Notes</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{kpis.open}</div>
+            {kpisLoading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <div className="text-2xl font-bold">{kpis.open_notes}</div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -197,7 +172,11 @@ export function ProductionNotesDashboard() {
             <CardTitle className="text-sm font-medium">Past Due</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-500">{kpis.pastDue}</div>
+            {kpisLoading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <div className="text-2xl font-bold text-red-500">{kpis.past_due}</div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -205,7 +184,11 @@ export function ProductionNotesDashboard() {
             <CardTitle className="text-sm font-medium">High/Critical</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-500">{kpis.highCritical}</div>
+            {kpisLoading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <div className="text-2xl font-bold text-orange-500">{kpis.high_critical}</div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -213,7 +196,11 @@ export function ProductionNotesDashboard() {
             <CardTitle className="text-sm font-medium">Blockers</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-yellow-500">{kpis.blockers}</div>
+            {kpisLoading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <div className="text-2xl font-bold text-yellow-500">{kpis.blockers}</div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -221,14 +208,18 @@ export function ProductionNotesDashboard() {
             <CardTitle className="text-sm font-medium">By Category</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-xs space-y-1">
-              {Object.entries(kpis.byCategory).map(([cat, count]) => (
-                <div key={cat} className="flex justify-between">
-                  <span className="capitalize">{cat}</span>
-                  <span className="font-semibold">{count}</span>
-                </div>
-              ))}
-            </div>
+            {kpisLoading ? (
+              <Skeleton className="h-16 w-full" />
+            ) : (
+              <div className="text-xs space-y-1">
+                {Object.entries(kpis.by_category).slice(0, 3).map(([cat, count]) => (
+                  <div key={cat} className="flex justify-between">
+                    <span className="capitalize">{cat}</span>
+                    <span className="font-semibold">{count}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -316,12 +307,18 @@ export function ProductionNotesDashboard() {
         <CardContent>
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-2 max-h-[600px] overflow-y-auto">
-              {filteredNotes.length === 0 ? (
+              {notesLoading ? (
+                <div className="space-y-2">
+                  {[...Array(5)].map((_, i) => (
+                    <Skeleton key={i} className="h-24 w-full" />
+                  ))}
+                </div>
+              ) : sortedNotes.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <p>No notes match your filters</p>
                 </div>
               ) : (
-                filteredNotes.map(note => (
+                sortedNotes.map(note => (
                   <button
                     key={note.id}
                     onClick={() => setSelectedNote(note)}
@@ -344,8 +341,8 @@ export function ProductionNotesDashboard() {
                         <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
                           <Badge variant="outline" className="text-xs">{note.category}</Badge>
                           <Badge variant="outline" className="text-xs">{note.discipline}</Badge>
-                          {note.assignee && <span>• {note.assignee}</span>}
-                          <span>• {new Date(note.updatedAt).toLocaleDateString()}</span>
+                          {note.assignee_name && <span>• {note.assignee_name}</span>}
+                          <span>• {new Date(note.updated_at).toLocaleDateString()}</span>
                         </div>
                       </div>
                     </div>

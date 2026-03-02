@@ -5,8 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Checkbox } from '@/components/ui/checkbox'
-import type { ProductionNote } from '@/lib/types'
+import type { ProductionNote } from '@/types/electron'
 import { toast } from 'sonner'
 
 interface CreateNoteDialogProps {
@@ -47,8 +46,6 @@ export function CreateNoteDialog({ open, onOpenChange, onCreate }: CreateNoteDia
       visibility: 'internal',
       tags: [],
     })
-    
-    toast.success('Note created successfully')
   }
 
   const handleTagsChange = (value: string) => {
@@ -180,12 +177,12 @@ export function CreateNoteDialog({ open, onOpenChange, onCreate }: CreateNoteDia
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="dueDate">Due Date</Label>
+              <Label htmlFor="due_date">Due Date</Label>
               <Input
-                id="dueDate"
+                id="due_date"
                 type="date"
-                value={formData.dueDate || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, dueDate: e.target.value }))}
+                value={formData.due_date || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, due_date: e.target.value }))}
               />
             </div>
           </div>
@@ -202,11 +199,11 @@ export function CreateNoteDialog({ open, onOpenChange, onCreate }: CreateNoteDia
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="pieceMark">Piece Mark</Label>
+              <Label htmlFor="piece_mark">Piece Mark</Label>
               <Input
-                id="pieceMark"
-                value={formData.pieceMark || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, pieceMark: e.target.value }))}
+                id="piece_mark"
+                value={formData.piece_mark || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, piece_mark: e.target.value }))}
                 placeholder="e.g., B-101"
               />
             </div>
