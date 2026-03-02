@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Plus, Calendar, Warning, CheckCircle, Clock } from '@phosphor-icons/react'
+import { Plus, Calendar, Warning, CheckCircle, Clock, PencilSimple, Trash } from '@phosphor-icons/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -18,6 +19,8 @@ export function SchedulePage() {
   const { projectId } = useParams()
   const [tasks, setTasks] = useKV<Task[]>(`schedule-tasks-${projectId}`, [])
   const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [isEditOpen, setIsEditOpen] = useState(false)
+  const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -44,7 +47,7 @@ export function SchedulePage() {
       createdAt: new Date().toISOString(),
     }
 
-    setTasks(current => [...current, newTask])
+    setTasks(current => [...(current || []), newTask])
     setIsCreateOpen(false)
     setFormData({
       name: '',
@@ -59,9 +62,57 @@ export function SchedulePage() {
     toast.success('Task created successfully')
   }
 
+  const handleEdit = (task: Task) => {
+    setEditingTask(task)
+    setFormData({
+      name: task.name,
+      description: task.description || '',
+      status: task.status,
+      priority: task.priority,
+      startDate: task.startDate,
+      endDate: task.endDate,
+      assignedTo: task.assignedTo || '',
+      percentComplete: task.percentComplete,
+    })
+    setIsEditOpen(true)
+  }
+
+  const handleUpdate = () => {
+    if (!formData.name || !formData.startDate || !formData.endDate || !editingTask) {
+      toast.error('Please fill in required fields')
+      return
+    }
+
+    setTasks(current =>
+      (current || []).map(task =>
+        task.id === editingTask.id
+          ? { ...task, ...formData }
+          : task
+      )
+    )
+    setIsEditOpen(false)
+    setEditingTask(null)
+    setFormData({
+      name: '',
+      description: '',
+      status: 'not-started',
+      priority: 'medium',
+      startDate: '',
+      endDate: '',
+      assignedTo: '',
+      percentComplete: 0,
+    })
+    toast.success('Task updated successfully')
+  }
+
+  const handleDelete = (taskId: string) => {
+    setTasks(current => (current || []).filter(task => task.id !== taskId))
+    toast.success('Task deleted successfully')
+  }
+
   const handleStatusChange = (taskId: string, newStatus: Task['status']) => {
     setTasks(current =>
-      current.map(task =>
+      (current || []).map(task =>
         task.id === taskId
           ? { ...task, status: newStatus, percentComplete: newStatus === 'completed' ? 100 : task.percentComplete }
           : task
@@ -90,9 +141,9 @@ export function SchedulePage() {
     return colors[priority]
   }
 
-  const criticalPathTasks = tasks.filter(t => t.isCriticalPath)
-  const completedTasks = tasks.filter(t => t.status === 'completed')
-  const blockedTasks = tasks.filter(t => t.status === 'blocked')
+  const criticalPathTasks = (tasks || []).filter(t => t.isCriticalPath)
+  const completedTasks = (tasks || []).filter(t => t.status === 'completed')
+  const blockedTasks = (tasks || []).filter(t => t.status === 'blocked')
 
   return (
     <div className="space-y-6">
@@ -201,6 +252,112 @@ export function SchedulePage() {
             </div>
           </DialogContent>
         </Dialog>
+
+        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Edit Task</DialogTitle>
+              <DialogDescription>Update task details</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-task-name">Task Name *</Label>
+                <Input
+                  id="edit-task-name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Enter task name"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-task-description">Description</Label>
+                <Textarea
+                  id="edit-task-description"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Task description"
+                  rows={3}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-task-status">Status</Label>
+                  <Select value={formData.status} onValueChange={(value: Task['status']) => setFormData({ ...formData, status: value })}>
+                    <SelectTrigger id="edit-task-status">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="not-started">Not Started</SelectItem>
+                      <SelectItem value="in-progress">In Progress</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="blocked">Blocked</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-task-priority">Priority</Label>
+                  <Select value={formData.priority} onValueChange={(value: Task['priority']) => setFormData({ ...formData, priority: value })}>
+                    <SelectTrigger id="edit-task-priority">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="critical">Critical</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-task-start">Start Date *</Label>
+                  <Input
+                    id="edit-task-start"
+                    type="date"
+                    value={formData.startDate}
+                    onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-task-end">End Date *</Label>
+                  <Input
+                    id="edit-task-end"
+                    type="date"
+                    value={formData.endDate}
+                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-task-assigned">Assigned To</Label>
+                <Input
+                  id="edit-task-assigned"
+                  value={formData.assignedTo}
+                  onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
+                  placeholder="Person or crew name"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-task-progress">Progress (%)</Label>
+                <Input
+                  id="edit-task-progress"
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={formData.percentComplete}
+                  onChange={(e) => setFormData({ ...formData, percentComplete: parseInt(e.target.value) || 0 })}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsEditOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleUpdate}>Update Task</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
@@ -210,7 +367,7 @@ export function SchedulePage() {
             <Calendar size={20} className="text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{tasks.length}</div>
+            <div className="text-2xl font-bold">{(tasks || []).length}</div>
             <p className="text-xs text-muted-foreground">
               {completedTasks.length} completed
             </p>
@@ -250,7 +407,7 @@ export function SchedulePage() {
           <CardDescription>All scheduled tasks for this project</CardDescription>
         </CardHeader>
         <CardContent>
-          {tasks.length === 0 ? (
+          {(tasks || []).length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <Calendar size={48} className="text-muted-foreground mb-4" />
               <h3 className="text-lg font-semibold mb-2">No tasks scheduled</h3>
@@ -276,7 +433,7 @@ export function SchedulePage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {tasks.map((task) => {
+                {(tasks || []).map((task) => {
                   const statusBadge = getStatusBadge(task.status)
                   return (
                     <TableRow key={task.id}>
@@ -315,17 +472,36 @@ export function SchedulePage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Select value={task.status} onValueChange={(value: Task['status']) => handleStatusChange(task.id, value)}>
-                          <SelectTrigger className="w-32">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="not-started">Not Started</SelectItem>
-                            <SelectItem value="in-progress">In Progress</SelectItem>
-                            <SelectItem value="completed">Completed</SelectItem>
-                            <SelectItem value="blocked">Blocked</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <div className="flex items-center gap-2">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleEdit(task)}
+                          >
+                            <PencilSimple size={16} />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <Trash size={16} className="text-destructive" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Task</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete "{task.name}"? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDelete(task.id)}>
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
                       </TableCell>
                     </TableRow>
                   )

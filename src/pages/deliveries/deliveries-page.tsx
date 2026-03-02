@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Plus, Truck, CheckCircle, Clock, Warning, X } from '@phosphor-icons/react'
+import { Plus, Truck, CheckCircle, Clock, Warning, X, PencilSimple, Trash } from '@phosphor-icons/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -18,12 +19,15 @@ export function DeliveriesPage() {
   const { projectId } = useParams()
   const [deliveries, setDeliveries] = useKV<Delivery[]>(`deliveries-${projectId}`, [])
   const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [isEditOpen, setIsEditOpen] = useState(false)
+  const [editingDelivery, setEditingDelivery] = useState<Delivery | null>(null)
   const [formData, setFormData] = useState({
     deliveryNumber: '',
     description: '',
     supplier: '',
     expectedDate: '',
     trackingNumber: '',
+    status: 'scheduled' as Delivery['status'],
   })
 
   const handleCreate = () => {
@@ -49,8 +53,53 @@ export function DeliveriesPage() {
       supplier: '',
       expectedDate: '',
       trackingNumber: '',
+      status: 'scheduled',
     })
     toast.success('Delivery scheduled successfully')
+  }
+
+  const handleEdit = (delivery: Delivery) => {
+    setEditingDelivery(delivery)
+    setFormData({
+      deliveryNumber: delivery.deliveryNumber,
+      description: delivery.description,
+      supplier: delivery.supplier,
+      expectedDate: delivery.expectedDate,
+      trackingNumber: delivery.trackingNumber || '',
+      status: delivery.status,
+    })
+    setIsEditOpen(true)
+  }
+
+  const handleUpdate = () => {
+    if (!formData.deliveryNumber || !formData.description || !formData.supplier || !formData.expectedDate || !editingDelivery) {
+      toast.error('Please fill in required fields')
+      return
+    }
+
+    setDeliveries(current =>
+      (current || []).map(delivery =>
+        delivery.id === editingDelivery.id
+          ? { ...delivery, ...formData }
+          : delivery
+      )
+    )
+    setIsEditOpen(false)
+    setEditingDelivery(null)
+    setFormData({
+      deliveryNumber: '',
+      description: '',
+      supplier: '',
+      expectedDate: '',
+      trackingNumber: '',
+      status: 'scheduled',
+    })
+    toast.success('Delivery updated successfully')
+  }
+
+  const handleDelete = (deliveryId: string) => {
+    setDeliveries(current => (current || []).filter(delivery => delivery.id !== deliveryId))
+    toast.success('Delivery deleted successfully')
   }
 
   const getStatusBadge = (status: Delivery['status']) => {

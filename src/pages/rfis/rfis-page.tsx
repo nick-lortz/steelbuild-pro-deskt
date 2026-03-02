@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Plus, Question, CheckCircle, Clock, Warning } from '@phosphor-icons/react'
+import { Plus, Question, CheckCircle, Clock, Warning, PencilSimple, Trash } from '@phosphor-icons/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -18,12 +19,15 @@ export function RFIsPage() {
   const { projectId } = useParams()
   const [rfis, setRfis] = useKV<RFI[]>(`rfis-${projectId}`, [])
   const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [isEditOpen, setIsEditOpen] = useState(false)
+  const [editingRFI, setEditingRFI] = useState<RFI | null>(null)
   const [formData, setFormData] = useState({
     number: '',
     subject: '',
     question: '',
     priority: 'medium' as RFI['priority'],
     dueDate: '',
+    status: 'open' as RFI['status'],
   })
 
   const handleCreate = () => {
@@ -50,8 +54,53 @@ export function RFIsPage() {
       question: '',
       priority: 'medium',
       dueDate: '',
+      status: 'open',
     })
     toast.success('RFI created successfully')
+  }
+
+  const handleEdit = (rfi: RFI) => {
+    setEditingRFI(rfi)
+    setFormData({
+      number: rfi.number,
+      subject: rfi.subject,
+      question: rfi.question,
+      priority: rfi.priority,
+      dueDate: rfi.dueDate || '',
+      status: rfi.status,
+    })
+    setIsEditOpen(true)
+  }
+
+  const handleUpdate = () => {
+    if (!formData.number || !formData.subject || !formData.question || !editingRFI) {
+      toast.error('Please fill in required fields')
+      return
+    }
+
+    setRfis(current =>
+      (current || []).map(rfi =>
+        rfi.id === editingRFI.id
+          ? { ...rfi, ...formData }
+          : rfi
+      )
+    )
+    setIsEditOpen(false)
+    setEditingRFI(null)
+    setFormData({
+      number: '',
+      subject: '',
+      question: '',
+      priority: 'medium',
+      dueDate: '',
+      status: 'open',
+    })
+    toast.success('RFI updated successfully')
+  }
+
+  const handleDelete = (rfiId: string) => {
+    setRfis(current => (current || []).filter(rfi => rfi.id !== rfiId))
+    toast.success('RFI deleted successfully')
   }
 
   const getStatusBadge = (status: RFI['status']) => {
@@ -160,6 +209,90 @@ export function RFIsPage() {
             </div>
           </DialogContent>
         </Dialog>
+
+        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Edit RFI</DialogTitle>
+              <DialogDescription>Update RFI details</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-rfi-number">RFI Number *</Label>
+                <Input
+                  id="edit-rfi-number"
+                  value={formData.number}
+                  onChange={(e) => setFormData({ ...formData, number: e.target.value })}
+                  placeholder="e.g., RFI-001"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-rfi-subject">Subject *</Label>
+                <Input
+                  id="edit-rfi-subject"
+                  value={formData.subject}
+                  onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                  placeholder="Brief subject"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-rfi-question">Question *</Label>
+                <Textarea
+                  id="edit-rfi-question"
+                  value={formData.question}
+                  onChange={(e) => setFormData({ ...formData, question: e.target.value })}
+                  placeholder="Detailed question or clarification needed"
+                  rows={5}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-rfi-priority">Priority</Label>
+                  <Select value={formData.priority} onValueChange={(value: RFI['priority']) => setFormData({ ...formData, priority: value })}>
+                    <SelectTrigger id="edit-rfi-priority">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="critical">Critical</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-rfi-status">Status</Label>
+                  <Select value={formData.status} onValueChange={(value: RFI['status']) => setFormData({ ...formData, status: value })}>
+                    <SelectTrigger id="edit-rfi-status">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="open">Open</SelectItem>
+                      <SelectItem value="answered">Answered</SelectItem>
+                      <SelectItem value="closed">Closed</SelectItem>
+                      <SelectItem value="escalated">Escalated</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-rfi-due">Due Date</Label>
+                <Input
+                  id="edit-rfi-due"
+                  type="date"
+                  value={formData.dueDate}
+                  onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsEditOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleUpdate}>Update RFI</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
@@ -232,10 +365,11 @@ export function RFIsPage() {
                   <TableHead>Submitted</TableHead>
                   <TableHead>Due Date</TableHead>
                   <TableHead>Days Open</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rfis.map((rfi) => {
+                {(rfis || []).map((rfi) => {
                   const statusBadge = getStatusBadge(rfi.status)
                   const daysOpen = Math.floor(
                     (new Date().getTime() - new Date(rfi.submittedDate).getTime()) / (1000 * 60 * 60 * 24)
@@ -269,6 +403,38 @@ export function RFIsPage() {
                         <Badge variant={daysOpen > 7 ? 'destructive' : 'outline'}>
                           {daysOpen}d
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleEdit(rfi)}
+                          >
+                            <PencilSimple size={16} />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <Trash size={16} className="text-destructive" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete RFI</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete "{rfi.number}"? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDelete(rfi.id)}>
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
                       </TableCell>
                     </TableRow>
                   )
