@@ -585,15 +585,27 @@ async function generatePMAInsights(projectId) {
   `).all(projectId);
   
   for (const rfi of agingRFIs) {
-    const ageInDays = Math.floor((now - new Date(rfi.created_at)) / (1000 * 60 * 60 * 24));
-    const severity = ageInDays > 7 ? 'high' : 'medium';
+    const createdDate = new Date(rfi.created_at);
+    const ageInHours = Math.floor((now - createdDate) / (1000 * 60 * 60));
+    const ageInDays = Math.floor(ageInHours / 24);
+    
+    let severity = 'medium';
+    let titleSuffix = `${ageInDays} days old`;
+    
+    if (ageInHours > 168) {
+      severity = 'high';
+      titleSuffix = `${ageInDays} days old (CRITICAL)`;
+    } else if (ageInHours > 72) {
+      severity = 'high';
+      titleSuffix = `${ageInHours} hours old (>72hr threshold)`;
+    }
     
     const insight = {
       project_id: projectId,
       severity,
       type: 'aging-rfi',
-      title: `RFI #${rfi.rfi_number} is ${ageInDays} days old`,
-      details: `RFI "${rfi.subject}" has been open for ${ageInDays} days without closure.`,
+      title: `⚠️ RFI #${rfi.rfi_number} is ${titleSuffix}`,
+      details: `RFI "${rfi.subject}" has been open for ${ageInHours} hours (${ageInDays} days) without closure. This exceeds the 72-hour response threshold and may be blocking critical work.`,
       entity_refs: [
         {
           entity_type: 'rfi',
@@ -931,13 +943,22 @@ async function listDrawingSets(projectId, options = {}) {
   return { success: true, data: results };
 }
 
-async function updateDrawingSetStatus(id, newStatus, userId = null) {
+async function updateDrawingSetStatus(id, newStatus, userId = null, userRole = 'user') {
   const db = getDatabase();
   const now = new Date().toISOString();
   
   const existing = db.select().from(drawing_sets).where(eq(drawing_sets.id, id)).get();
   if (!existing) {
     return { success: false, error: 'Drawing set not found' };
+  }
+  
+  if (existing.status === 'FFF') {
+    if (userRole !== 'admin' && userRole !== 'project_manager') {
+      return { 
+        success: false, 
+        error: 'Drawing set is locked at FFF (Final for Fabrication). Only Admins and Project Managers can modify FFF drawings to prevent shop-floor errors.' 
+      };
+    }
   }
   
   const transition = canTransitionStatus(existing.status, newStatus);
@@ -953,10 +974,10 @@ async function updateDrawingSetStatus(id, newStatus, userId = null) {
   logAudit('drawing_set', id, 'status-change', existing.project_id, { from: existing.status, to: newStatus }, userId);
   
   const statusMessages = {
-    'BFA': 'ready for fabricator review',
-    'OFS': 'out for signature',
-    'BFS': 'back from signature',
-    'FFF': 'fully approved for fabrication'
+    'IFA': 'issued for approval',
+    'BFA': 'ready for build/fabricator approval',
+    'OFS': 'open for shop fabrication',
+    'FFF': 'LOCKED - Final for Fabrication (shop-ready)'
   };
   
   await createNotification({
@@ -972,10 +993,25 @@ async function updateDrawingSetStatus(id, newStatus, userId = null) {
     ]
   });
   
+  if (newStatus === 'FFF') {
+    await createNotification({
+      project_id: existing.project_id,
+      type: 'drawing-locked',
+      message: `⚠️ Drawing set "${existing.name}" is now LOCKED at FFF. Edit and Delete are disabled for non-admins to prevent costly shop-floor errors.`,
+      entity_refs: [
+        {
+          entity_type: 'drawing_set',
+          entity_id: id,
+          label: existing.name,
+        }
+      ]
+    });
+  }
+  
   return { success: true };
 }
 
-async function deleteDrawingSet(id, userId = null) {
+async function deleteDrawingSet(id, userId = null, userRole = 'user') {
   const db = getDatabase();
   const now = new Date().toISOString();
   
@@ -984,12 +1020,21 @@ async function deleteDrawingSet(id, userId = null) {
     return { success: false, error: 'Drawing set not found' };
   }
   
+  if (existing.status === 'FFF') {
+    if (userRole !== 'admin' && userRole !== 'project_manager') {
+      return { 
+        success: false, 
+        error: 'Cannot delete FFF (Final for Fabrication) drawing set. This drawing is locked to prevent shop-floor errors. Only Admins can delete FFF drawings.' 
+      };
+    }
+  }
+  
   db.update(drawing_sets)
-    .set({ deleted_at: now })
+    .set({ deleted_at: now, updated_by: userId })
     .where(eq(drawing_sets.id, id))
     .run();
   
-  logAudit('drawing_set', id, 'delete', existing.project_id, null, userId);
+  logAudit('drawing_set', id, 'delete', existing.project_id, { status: existing.status, role: userRole }, userId);
   
   return { success: true };
 }
@@ -1054,13 +1099,22 @@ async function listDrawingSheets(setId, options = {}) {
   return { success: true, data: results };
 }
 
-async function updateDrawingSheetStatus(id, newStatus, userId = null) {
+async function updateDrawingSheetStatus(id, newStatus, userId = null, userRole = 'user') {
   const sqliteDb = getSQLiteDB();
   const now = new Date().toISOString();
   
   const existing = sqliteDb.prepare('SELECT * FROM drawing_sheets WHERE id = ?').get(id);
   if (!existing) {
     return { success: false, error: 'Drawing sheet not found' };
+  }
+  
+  if (existing.status === 'FFF') {
+    if (userRole !== 'admin' && userRole !== 'project_manager') {
+      return { 
+        success: false, 
+        error: 'Drawing sheet is locked at FFF (Final for Fabrication). Only Admins can modify FFF sheets to prevent costly shop-floor errors.' 
+      };
+    }
   }
   
   const transition = canTransitionStatus(existing.status, newStatus);
@@ -1095,7 +1149,7 @@ async function updateDrawingSheetStatus(id, newStatus, userId = null) {
   return { success: true };
 }
 
-async function deleteDrawingSheet(id, userId = null) {
+async function deleteDrawingSheet(id, userId = null, userRole = 'user') {
   const sqliteDb = getSQLiteDB();
   const now = new Date().toISOString();
   
@@ -1104,11 +1158,20 @@ async function deleteDrawingSheet(id, userId = null) {
     return { success: false, error: 'Drawing sheet not found' };
   }
   
-  sqliteDb.prepare('UPDATE drawing_sheets SET deleted_at = ? WHERE id = ?').run(now, id);
+  if (existing.status === 'FFF') {
+    if (userRole !== 'admin' && userRole !== 'project_manager') {
+      return { 
+        success: false, 
+        error: 'Cannot delete FFF (Final for Fabrication) drawing sheet. This sheet is locked to prevent shop-floor errors. Only Admins can delete FFF sheets.' 
+      };
+    }
+  }
+  
+  sqliteDb.prepare('UPDATE drawing_sheets SET deleted_at = ?, updated_by = ? WHERE id = ?').run(now, userId, id);
   
   const set = sqliteDb.prepare('SELECT project_id FROM drawing_sets WHERE id = ?').get(existing.set_id);
   if (set) {
-    logAudit('drawing_sheet', id, 'delete', set.project_id, null, userId);
+    logAudit('drawing_sheet', id, 'delete', set.project_id, { status: existing.status, role: userRole }, userId);
   }
   
   return { success: true };
@@ -1197,6 +1260,7 @@ async function updateChangeOrder(id, data) {
     return { success: false, error: 'Change order not found' };
   }
   
+  const wasApproved = existing.status === 'approved';
   const updateFields = [];
   const values = [];
   
@@ -1237,8 +1301,28 @@ async function updateChangeOrder(id, data) {
   sqliteDb.prepare(`UPDATE change_orders SET ${updateFields.join(', ')} WHERE id = ?`).run(...values);
   logAudit('change_order', id, 'update', existing.project_id, data, data.updated_by);
   
-  if (data.status === 'approved' && existing.status !== 'approved') {
+  if (data.status === 'approved' && !wasApproved) {
     await recalculateProjectBudget(existing.project_id);
+    await recalculateProjectTotals(existing.project_id);
+    
+    const updatedCO = sqliteDb.prepare('SELECT * FROM change_orders WHERE id = ?').get(id);
+    
+    await createNotification({
+      project_id: existing.project_id,
+      type: 'change-order-approved',
+      message: `💰 Change Order #${existing.number} "${existing.title}" has been APPROVED. Contract Value and Budget automatically updated (+$${(updatedCO.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`,
+      entity_refs: [
+        {
+          entity_type: 'change_order',
+          entity_id: id,
+          label: `CO #${existing.number}`,
+          link: `/projects/${existing.project_id}/change-orders?co=${id}`
+        }
+      ]
+    });
+  } else if (data.status === 'approved') {
+    await recalculateProjectBudget(existing.project_id);
+    await recalculateProjectTotals(existing.project_id);
   }
   
   return { success: true };
@@ -1457,24 +1541,62 @@ async function calculateAutomatedSOV(projectId) {
     
     let percentComplete = 0;
     if (relatedTasks.length > 0) {
-      percentComplete = relatedTasks.reduce((sum, t) => sum + t.percent_complete, 0) / relatedTasks.length;
+      percentComplete = relatedTasks.reduce((sum, t) => sum + (t.percent_complete || 0), 0) / relatedTasks.length;
     }
     
-    const budgetWithCOs = cc.budget_amount;
-    const billableToDate = (budgetWithCOs * percentComplete) / 100;
+    const budgetWithCOs = cc.budget_amount || 0;
+    const completedToDate = (budgetWithCOs * percentComplete) / 100;
+    
+    const previouslyBilled = cc.previously_billed || 0;
+    const billableThisPeriod = Math.max(0, completedToDate - previouslyBilled);
+    
+    const retainage = cc.retainage_percent || 10;
+    const retainageAmount = (completedToDate * retainage) / 100;
+    const netBillable = completedToDate - retainageAmount;
     
     sovItems.push({
       cost_code_id: cc.id,
       cost_code: cc.code,
       description: cc.description,
       scheduled_value: budgetWithCOs,
-      percent_complete: Math.round(percentComplete),
-      completed_to_date: billableToDate,
-      balance_to_finish: budgetWithCOs - billableToDate,
+      percent_complete: Math.round(percentComplete * 10) / 10,
+      work_completed_to_date: completedToDate,
+      previously_billed: previouslyBilled,
+      billable_this_period: billableThisPeriod,
+      retainage_percent: retainage,
+      retainage_amount: retainageAmount,
+      net_billable: netBillable,
+      balance_to_finish: budgetWithCOs - completedToDate,
+      materials_presently_stored: 0,
+      related_task_count: relatedTasks.length,
+      related_tasks: relatedTasks.map(t => ({
+        id: t.id,
+        name: t.name,
+        percent_complete: t.percent_complete || 0,
+      })),
     });
   }
   
-  return { success: true, data: sovItems };
+  const summary = {
+    total_scheduled_value: sovItems.reduce((sum, item) => sum + item.scheduled_value, 0),
+    total_completed_to_date: sovItems.reduce((sum, item) => sum + item.work_completed_to_date, 0),
+    total_previously_billed: sovItems.reduce((sum, item) => sum + item.previously_billed, 0),
+    total_billable_this_period: sovItems.reduce((sum, item) => sum + item.billable_this_period, 0),
+    total_retainage: sovItems.reduce((sum, item) => sum + item.retainage_amount, 0),
+    total_net_billable: sovItems.reduce((sum, item) => sum + item.net_billable, 0),
+    total_balance_to_finish: sovItems.reduce((sum, item) => sum + item.balance_to_finish, 0),
+    overall_percent_complete: 0,
+  };
+  
+  summary.overall_percent_complete = summary.total_scheduled_value > 0 
+    ? Math.round((summary.total_completed_to_date / summary.total_scheduled_value) * 1000) / 10 
+    : 0;
+  
+  return { 
+    success: true, 
+    data: sovItems,
+    summary 
+  };
 }
 
 async function getProjectFinancialSummary(projectId) {
@@ -1871,6 +1993,74 @@ async function listProjects(options = {}) {
   return { success: true, data: results };
 }
 
+async function getPMADailyBrief(projectId) {
+  const sqliteDb = getSQLiteDB();
+  
+  const insights = await listPMAInsights(projectId, { status: 'open' });
+  const insightData = insights.data || [];
+  
+  const criticalCount = insightData.filter(i => i.severity === 'high').length;
+  const mediumCount = insightData.filter(i => i.severity === 'medium').length;
+  const lowCount = insightData.filter(i => i.severity === 'low').length;
+  
+  const agingRFIs = insightData.filter(i => i.type === 'aging-rfi');
+  const budgetIssues = insightData.filter(i => i.type === 'budget-overage' || i.type === 'budget-variance-early');
+  const scheduleIssues = insightData.filter(i => i.type === 'schedule-slippage');
+  
+  let summaryText = '';
+  if (insightData.length === 0) {
+    summaryText = '✅ No active risks detected. Project is on track.';
+  } else {
+    const parts = [];
+    if (criticalCount > 0) parts.push(`${criticalCount} critical issue${criticalCount !== 1 ? 's' : ''}`);
+    if (mediumCount > 0) parts.push(`${mediumCount} medium concern${mediumCount !== 1 ? 's' : ''}`);
+    if (lowCount > 0) parts.push(`${lowCount} low priority item${lowCount !== 1 ? 's' : ''}`);
+    summaryText = `⚠️ Detected ${parts.join(', ')} requiring attention.`;
+  }
+  
+  const topRisks = insightData
+    .sort((a, b) => {
+      const severityOrder = { high: 0, medium: 1, low: 2 };
+      return (severityOrder[a.severity] || 999) - (severityOrder[b.severity] || 999);
+    })
+    .slice(0, 5);
+  
+  const recommendedActions = topRisks.map(risk => {
+    let action = '';
+    if (risk.type === 'aging-rfi') {
+      action = `📋 Follow up on ${risk.title} - may be blocking critical path`;
+    } else if (risk.type === 'budget-overage') {
+      action = `💰 Review ${risk.title} - implement cost control measures`;
+    } else if (risk.type === 'schedule-slippage') {
+      action = `📅 ${risk.title} - reallocate resources or adjust schedule`;
+    } else {
+      action = risk.title;
+    }
+    return action;
+  });
+  
+  return {
+    success: true,
+    data: {
+      summary: summaryText,
+      total_insights: insightData.length,
+      critical_count: criticalCount,
+      medium_count: mediumCount,
+      low_count: lowCount,
+      aging_rfi_count: agingRFIs.length,
+      budget_issue_count: budgetIssues.length,
+      schedule_issue_count: scheduleIssues.length,
+      top_risks: topRisks,
+      recommended_actions: recommendedActions,
+      breakdown: {
+        aging_rfis: agingRFIs,
+        budget_issues: budgetIssues,
+        schedule_issues: scheduleIssues,
+      }
+    }
+  };
+}
+
 module.exports = {
   createRFI,
   listRFIs,
@@ -1894,6 +2084,7 @@ module.exports = {
   resolvePMAInsight,
   dismissPMAInsight,
   generatePMAInsights,
+  getPMADailyBrief,
   getDashboardCounts,
   createNotification,
   listNotifications,

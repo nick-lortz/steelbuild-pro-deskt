@@ -21,6 +21,7 @@ const fallbackDB = {
   recalculateProjectTotals: async () => ({ success: false, data: { totalContractValue: 0, totalBudget: 0, totalActual: 0, margin: 0 } }),
   listPMAInsights: async () => ({ success: false, data: [] as PMAInsight[] }),
   generatePMAInsights: async () => ({ success: false, data: [] as PMAInsight[] }),
+  getPMADailyBrief: async () => ({ success: false, data: null }),
   resolvePMAInsight: async () => ({ success: false, error: 'Not running in desktop mode' }),
   dismissPMAInsight: async () => ({ success: false, error: 'Not running in desktop mode' }),
   createChangeOrder: async () => ({ success: false, error: 'Not running in desktop mode' }),

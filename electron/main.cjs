@@ -25,6 +25,7 @@ const {
   resolvePMAInsight,
   dismissPMAInsight,
   generatePMAInsights,
+  getPMADailyBrief,
   getDashboardCounts,
   createNotification,
   listNotifications,
@@ -661,6 +662,14 @@ ipcMain.handle("db:generatePMAInsights", async (event, projectId) => {
   }
 });
 
+ipcMain.handle("db:getPMADailyBrief", async (event, projectId) => {
+  try {
+    return await getPMADailyBrief(projectId);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
 ipcMain.handle("db:createNotification", async (event, data) => {
   try {
     return await createNotification(data);
@@ -701,17 +710,17 @@ ipcMain.handle("db:listDrawingSets", async (event, projectId, options) => {
   }
 });
 
-ipcMain.handle("db:updateDrawingSetStatus", async (event, id, newStatus, userId) => {
+ipcMain.handle("db:updateDrawingSetStatus", async (event, id, newStatus, userId, userRole) => {
   try {
-    return await updateDrawingSetStatus(id, newStatus, userId);
+    return await updateDrawingSetStatus(id, newStatus, userId, userRole);
   } catch (error) {
     return { success: false, error: error.message };
   }
 });
 
-ipcMain.handle("db:deleteDrawingSet", async (event, id, userId) => {
+ipcMain.handle("db:deleteDrawingSet", async (event, id, userId, userRole) => {
   try {
-    return await deleteDrawingSet(id, userId);
+    return await deleteDrawingSet(id, userId, userRole);
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -733,17 +742,17 @@ ipcMain.handle("db:listDrawingSheets", async (event, setId, options) => {
   }
 });
 
-ipcMain.handle("db:updateDrawingSheetStatus", async (event, id, newStatus, userId) => {
+ipcMain.handle("db:updateDrawingSheetStatus", async (event, id, newStatus, userId, userRole) => {
   try {
-    return await updateDrawingSheetStatus(id, newStatus, userId);
+    return await updateDrawingSheetStatus(id, newStatus, userId, userRole);
   } catch (error) {
     return { success: false, error: error.message };
   }
 });
 
-ipcMain.handle("db:deleteDrawingSheet", async (event, id, userId) => {
+ipcMain.handle("db:deleteDrawingSheet", async (event, id, userId, userRole) => {
   try {
-    return await deleteDrawingSheet(id, userId);
+    return await deleteDrawingSheet(id, userId, userRole);
   } catch (error) {
     return { success: false, error: error.message };
   }
