@@ -43,11 +43,11 @@ This is a multi-module construction ERP system with project hierarchies, cost tr
 - **Success criteria**: Contracts save and update correctly, validation prevents incomplete data
 
 ### Drawing Management
-- **Functionality**: Organize drawing sets, sheets, and revision history for steel shop drawings
-- **Purpose**: Version control and distribution of fabrication/erection drawings
-- **Trigger**: User uploads drawing set or adds revision to existing set
-- **Progression**: Drawing Sets List → Create Set → Add Sheets → Upload Revision → Mark Current → Distribution Log
-- **Success criteria**: Usable workflow, clear current vs superseded status, no confusion about which revision is active
+- **Functionality**: Organize drawing sets, sheets, and revision history for steel shop drawings with in-app PDF viewing
+- **Purpose**: Version control, distribution, and viewing of fabrication/erection drawings
+- **Trigger**: User uploads drawing set, adds revision to existing set, or clicks to view PDF
+- **Progression**: Drawing Sets List → Create Set → Add Sheets → Upload Revision → Mark Current → Distribution Log → View PDF in-app
+- **Success criteria**: Usable workflow, clear current vs superseded status, no confusion about which revision is active, PDFs viewable with zoom/navigation controls
 
 ### Equipment Scheduling
 - **Functionality**: Track equipment availability, assignments, and maintenance

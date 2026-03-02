@@ -14,6 +14,7 @@ import { CustomReportBuilderPage } from '@/pages/financials/custom-report-builde
 import { RFIsPage } from '@/pages/rfis/rfis-page'
 import { DocumentsPage } from '@/pages/documents/documents-page'
 import { DrawingsDBPage } from '@/pages/drawings/drawings-db-page'
+import { DrawingViewerPage } from '@/pages/drawings/drawing-viewer-page'
 import { WorkPackagesPage } from '@/pages/work-packages/work-packages-page'
 import { DeliveriesPage } from '@/pages/deliveries/deliveries-page'
 import { LaborPage } from '@/pages/labor/labor-page'
@@ -119,6 +120,10 @@ export const router = createBrowserRouter([
           {
             path: 'drawings',
             element: <DrawingsDBPage />,
+          },
+          {
+            path: 'drawings/viewer',
+            element: <DrawingViewerPage />,
           },
           {
             path: 'work-packages',
