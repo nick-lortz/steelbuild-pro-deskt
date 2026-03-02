@@ -1,6 +1,19 @@
-import { useState } from 'react'
-import { useParams } from 'react-router-dom'
-import { Plus, Stack, FileText, GitBranch, Upload, Sparkle, Eye, Warning } from '@phosphor-icons/react'
+import { useState, useEffect } from 'react'
+import { useParams, Link } from 'react-router-dom'
+import {
+  Plus,
+  Stack,
+  FileText,
+  GitBranch,
+  Upload,
+  Eye,
+  Warning,
+  MagnifyingGlass,
+  CheckCircle,
+  X,
+  Flag,
+  ArrowsClockwise,
+} from '@phosphor-icons/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -12,31 +25,37 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Progress } from '@/components/ui/progress'
 import { useKV } from '@github/spark/hooks'
 import { toast } from 'sonner'
 import type { DrawingSet, DrawingSheet, DrawingRevision } from '@/lib/types'
-
-interface DrawingConflict {
-  id: string
-  sheetId: string
-  type: 'dimension-conflict' | 'missing-detail' | 'scope-change' | 'coordination-issue'
-  description: string
-  severity: 'low' | 'medium' | 'high'
-  status: 'open' | 'resolved'
-  createdAt: string
-}
+import type { DrawingConflict, ScopeChangeFlag, DrawingQAResult } from '@/lib/types-drawings'
+import {
+  getConflicts,
+  createConflict,
+  resolveConflict,
+  getScopeChanges,
+  createScopeChangeFlag,
+  updateScopeChangeStatus,
+  runDrawingQA,
+  compareRevisions,
+} from '@/lib/functions/drawings-enhanced'
 
 export function DrawingsPage() {
   const { projectId } = useParams()
   const [drawingSets, setDrawingSets] = useKV<DrawingSet[]>(`drawing-sets-${projectId}`, [])
-  const [conflicts, setConflicts] = useKV<DrawingConflict[]>(`drawing-conflicts-${projectId}`, [])
+  const [conflicts, setConflicts] = useState<DrawingConflict[]>([])
+  const [scopeChanges, setScopeChanges] = useState<ScopeChangeFlag[]>([])
   const [isCreateSetOpen, setIsCreateSetOpen] = useState(false)
   const [isAddSheetOpen, setIsAddSheetOpen] = useState(false)
   const [isAddRevisionOpen, setIsAddRevisionOpen] = useState(false)
+  const [isConflictDialogOpen, setIsConflictDialogOpen] = useState(false)
+  const [isScopeChangeDialogOpen, setIsScopeChangeDialogOpen] = useState(false)
+  const [isCompareDialogOpen, setIsCompareDialogOpen] = useState(false)
   const [selectedSet, setSelectedSet] = useState<DrawingSet | null>(null)
   const [selectedSheet, setSelectedSheet] = useState<DrawingSheet | null>(null)
-  const [analyzing, setAnalyzing] = useState(false)
+  const [selectedRevision, setSelectedRevision] = useState<DrawingRevision | null>(null)
+  const [qaResult, setQAResult] = useState<DrawingQAResult | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
 
   const [setFormData, setSetFormData] = useState({
     setNumber: '',
@@ -54,6 +73,39 @@ export function DrawingsPage() {
     description: '',
     date: new Date().toISOString().split('T')[0],
   })
+
+  const [conflictFormData, setConflictFormData] = useState({
+    type: 'dimension-mismatch' as DrawingConflict['type'],
+    severity: 'medium' as DrawingConflict['severity'],
+    title: '',
+    description: '',
+    location: '',
+  })
+
+  const [scopeChangeFormData, setScopeChangeFormData] = useState({
+    title: '',
+    description: '',
+    impactType: 'design' as ScopeChangeFlag['impactType'],
+    estimatedImpact: '',
+  })
+
+  useEffect(() => {
+    loadConflictsAndScopeChanges()
+  }, [projectId])
+
+  const loadConflictsAndScopeChanges = async () => {
+    if (!projectId) return
+    try {
+      const [conflictsData, scopeChangesData] = await Promise.all([
+        getConflicts(projectId),
+        getScopeChanges(projectId),
+      ])
+      setConflicts(conflictsData)
+      setScopeChanges(scopeChangesData)
+    } catch (error) {
+      console.error('Failed to load conflicts and scope changes:', error)
+    }
+  }
 
   const handleCreateSet = () => {
     if (!setFormData.setNumber || !setFormData.title) {

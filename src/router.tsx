@@ -36,6 +36,7 @@ import { LookAheadPlanningPage } from '@/pages/lookahead/lookahead-planning-page
 import { ProjectContactsPage } from '@/pages/contacts/project-contacts-page'
 import { JobSetupPage } from '@/pages/job-setup/job-setup-page'
 import { SettingsPage } from '@/pages/global/settings-page'
+import { PMAPage } from '@/pages/projects/pma-page'
 
 export const router = createBrowserRouter([
   {
@@ -185,6 +186,10 @@ export const router = createBrowserRouter([
           {
             path: 'job-setup',
             element: <JobSetupPage />,
+          },
+          {
+            path: 'pma',
+            element: <PMAPage />,
           },
         ],
       },
