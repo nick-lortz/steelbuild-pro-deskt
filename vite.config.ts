@@ -7,9 +7,11 @@ import createIconImportProxy from "@github/spark/vitePhosphorIconProxyPlugin";
 import { resolve } from 'path'
 
 const projectRoot = process.env.PROJECT_ROOT || import.meta.dirname
+const isElectron = process.env.ELECTRON === "true";
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: isElectron ? "./" : "/",
   plugins: [
     react(),
     tailwindcss(),
@@ -21,5 +23,9 @@ export default defineConfig({
     alias: {
       '@': resolve(projectRoot, 'src')
     }
+  },
+  build: {
+    outDir: "dist",
+    emptyOutDir: true,
   },
 });
