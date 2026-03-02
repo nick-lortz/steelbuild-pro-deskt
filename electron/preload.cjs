@@ -22,8 +22,20 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
 
   db: {
-    query: (query, params) => ipcRenderer.invoke("db:query", query, params),
-    execute: (query, params) => ipcRenderer.invoke("db:execute", query, params),
+    init: () => ipcRenderer.invoke("db:init"),
+    createRFI: (data) => ipcRenderer.invoke("db:createRFI", data),
+    listRFIs: (projectId, options) => ipcRenderer.invoke("db:listRFIs", projectId, options),
+    updateRFI: (id, data) => ipcRenderer.invoke("db:updateRFI", id, data),
+    deleteRFI: (id, userId) => ipcRenderer.invoke("db:deleteRFI", id, userId),
+    createEquipment: (data) => ipcRenderer.invoke("db:createEquipment", data),
+    listEquipment: (projectId, options) => ipcRenderer.invoke("db:listEquipment", projectId, options),
+    updateEquipment: (id, data) => ipcRenderer.invoke("db:updateEquipment", id, data),
+    deleteEquipment: (id, userId) => ipcRenderer.invoke("db:deleteEquipment", id, userId),
+    createCostCode: (data) => ipcRenderer.invoke("db:createCostCode", data),
+    listCostCodes: (projectId, options) => ipcRenderer.invoke("db:listCostCodes", projectId, options),
+    updateCostCode: (id, data) => ipcRenderer.invoke("db:updateCostCode", id, data),
+    deleteCostCode: (id, userId) => ipcRenderer.invoke("db:deleteCostCode", id, userId),
+    getDashboardCounts: (projectId) => ipcRenderer.invoke("db:getDashboardCounts", projectId),
   },
 
   menu: {
@@ -50,4 +62,23 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
 
   isElectron: true,
+});
+
+contextBridge.exposeInMainWorld("SBP", {
+  db: {
+    init: () => ipcRenderer.invoke("db:init"),
+    createRFI: (data) => ipcRenderer.invoke("db:createRFI", data),
+    listRFIs: (projectId, options) => ipcRenderer.invoke("db:listRFIs", projectId, options),
+    updateRFI: (id, data) => ipcRenderer.invoke("db:updateRFI", id, data),
+    deleteRFI: (id, userId) => ipcRenderer.invoke("db:deleteRFI", id, userId),
+    createEquipment: (data) => ipcRenderer.invoke("db:createEquipment", data),
+    listEquipment: (projectId, options) => ipcRenderer.invoke("db:listEquipment", projectId, options),
+    updateEquipment: (id, data) => ipcRenderer.invoke("db:updateEquipment", id, data),
+    deleteEquipment: (id, userId) => ipcRenderer.invoke("db:deleteEquipment", id, userId),
+    createCostCode: (data) => ipcRenderer.invoke("db:createCostCode", data),
+    listCostCodes: (projectId, options) => ipcRenderer.invoke("db:listCostCodes", projectId, options),
+    updateCostCode: (id, data) => ipcRenderer.invoke("db:updateCostCode", id, data),
+    deleteCostCode: (id, userId) => ipcRenderer.invoke("db:deleteCostCode", id, userId),
+    getDashboardCounts: (projectId) => ipcRenderer.invoke("db:getDashboardCounts", projectId),
+  },
 });

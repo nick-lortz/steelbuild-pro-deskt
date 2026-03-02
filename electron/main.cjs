@@ -1,6 +1,22 @@
 const { app, BrowserWindow, Menu, dialog, ipcMain, shell } = require("electron");
 const path = require("path");
 const fs = require("fs");
+const { initDatabase, closeDatabase } = require("./db/init");
+const {
+  createRFI,
+  listRFIs,
+  updateRFI,
+  deleteRFI,
+  createEquipment,
+  listEquipment,
+  updateEquipment,
+  deleteEquipment,
+  createCostCode,
+  listCostCodes,
+  updateCostCode,
+  deleteCostCode,
+  getDashboardCounts,
+} = require("./db/queries");
 
 const isDev = !app.isPackaged;
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL || "http://localhost:5173";
@@ -201,6 +217,9 @@ Export Daily Report: Ctrl/Cmd + E
 }
 
 app.whenReady().then(() => {
+  const userDataPath = app.getPath("userData");
+  initDatabase(userDataPath);
+  
   createWindow();
 
   app.on("activate", () => {
@@ -211,9 +230,14 @@ app.whenReady().then(() => {
 });
 
 app.on("window-all-closed", () => {
+  closeDatabase();
   if (process.platform !== "darwin") {
     app.quit();
   }
+});
+
+app.on("before-quit", () => {
+  closeDatabase();
 });
 
 ipcMain.handle("app:getVersion", () => {
@@ -272,10 +296,115 @@ ipcMain.handle("fs:readFile", async (event, filePath) => {
   }
 });
 
-ipcMain.handle("db:query", async (event, query, params) => {
-  return { success: true, data: [], message: "Database stub - implement in Sprint 2" };
+ipcMain.handle("db:init", async () => {
+  try {
+    const userDataPath = app.getPath("userData");
+    return initDatabase(userDataPath);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
 });
 
-ipcMain.handle("db:execute", async (event, query, params) => {
-  return { success: true, affectedRows: 0, message: "Database stub - implement in Sprint 2" };
+ipcMain.handle("db:createRFI", async (event, data) => {
+  try {
+    return await createRFI(data);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:listRFIs", async (event, projectId, options) => {
+  try {
+    return await listRFIs(projectId, options);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:updateRFI", async (event, id, data) => {
+  try {
+    return await updateRFI(id, data);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:deleteRFI", async (event, id, userId) => {
+  try {
+    return await deleteRFI(id, userId);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:createEquipment", async (event, data) => {
+  try {
+    return await createEquipment(data);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:listEquipment", async (event, projectId, options) => {
+  try {
+    return await listEquipment(projectId, options);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:updateEquipment", async (event, id, data) => {
+  try {
+    return await updateEquipment(id, data);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:deleteEquipment", async (event, id, userId) => {
+  try {
+    return await deleteEquipment(id, userId);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:createCostCode", async (event, data) => {
+  try {
+    return await createCostCode(data);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:listCostCodes", async (event, projectId, options) => {
+  try {
+    return await listCostCodes(projectId, options);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:updateCostCode", async (event, id, data) => {
+  try {
+    return await updateCostCode(id, data);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:deleteCostCode", async (event, id, userId) => {
+  try {
+    return await deleteCostCode(id, userId);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:getDashboardCounts", async (event, projectId) => {
+  try {
+    return await getDashboardCounts(projectId);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
 });
