@@ -23,6 +23,7 @@ import { toast } from 'sonner'
 import { businessRules, BusinessRuleError } from '@/lib/business-rules'
 import type { RFI } from '@/lib/types'
 import { useKV } from '@github/spark/hooks'
+import { getLocalDateString } from '@/lib/utils'
 
 interface RFIFormDialogProps {
   open: boolean
@@ -50,7 +51,7 @@ export function RFIFormDialog({
       status: 'open' as const,
       priority: 'medium' as const,
       submittedBy: '',
-      submittedDate: new Date().toISOString().split('T')[0],
+      submittedDate: getLocalDateString(),
       dueDate: '',
     },
   })
@@ -66,7 +67,7 @@ export function RFIFormDialog({
         status: 'open' as const,
         priority: 'medium' as const,
         submittedBy: '',
-        submittedDate: new Date().toISOString().split('T')[0],
+        submittedDate: getLocalDateString(),
         dueDate: '',
       })
     }

@@ -25,6 +25,7 @@ import { businessRules, BusinessRuleError } from '@/lib/business-rules'
 import type { Project } from '@/lib/types'
 import { InlineGradientSuggestions } from '@/components/shared/auto-gradient-suggestions'
 import { useProjectGradient } from '@/hooks/use-gradient'
+import { getLocalDateString } from '@/lib/utils'
 
 interface ProjectFormDialogProps {
   open: boolean
@@ -49,7 +50,7 @@ export function ProjectFormDialog({
       location: '',
       status: 'planning' as const,
       contractValue: 0,
-      startDate: new Date().toISOString().split('T')[0],
+      startDate: getLocalDateString(),
       description: '',
       type: '',
     },

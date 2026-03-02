@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useKV } from '@github/spark/hooks'
 import { toast } from 'sonner'
 import type { ChangeOrder, ChangeOrderLineItem } from '@/lib/types'
+import { getLocalDateString } from '@/lib/utils'
 
 export function ChangeOrdersPageImpl() {
   const { projectId } = useParams()
