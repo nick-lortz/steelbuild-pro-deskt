@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { RFI, Equipment, CostCode, DashboardCounts, DBResult, PMAInsight, Task } from '@/types/electron';
+import type { RFI, Equipment, CostCode, DashboardCounts, DBResult, PMAInsight, Task, ChangeOrder, Contract } from '@/types/electron';
 
 const isDesktop = typeof window !== 'undefined' && window.SBP?.db;
 
@@ -23,11 +23,11 @@ const fallbackDB = {
   resolvePMAInsight: async () => ({ success: false, error: 'Not running in desktop mode' }),
   dismissPMAInsight: async () => ({ success: false, error: 'Not running in desktop mode' }),
   createChangeOrder: async () => ({ success: false, error: 'Not running in desktop mode' }),
-  listChangeOrders: async () => ({ success: false, data: [] }),
+  listChangeOrders: async () => ({ success: false, data: [] as ChangeOrder[] }),
   updateChangeOrder: async () => ({ success: false, error: 'Not running in desktop mode' }),
   deleteChangeOrder: async () => ({ success: false, error: 'Not running in desktop mode' }),
   createContract: async () => ({ success: false, error: 'Not running in desktop mode' }),
-  listContracts: async () => ({ success: false, data: [] }),
+  listContracts: async () => ({ success: false, data: [] as Contract[] }),
   updateContract: async () => ({ success: false, error: 'Not running in desktop mode' }),
   deleteContract: async () => ({ success: false, error: 'Not running in desktop mode' }),
   calculateAutomatedSOV: async () => ({ success: false, data: [] }),
@@ -377,5 +377,187 @@ export function usePMAInsights(projectId: string | undefined) {
     resolveInsight,
     dismissInsight,
     reload: loadInsights,
+  };
+}
+
+export function useChangeOrders(projectId: string | undefined) {
+  const { db, isDesktop } = useDatabase();
+  const [changeOrders, setChangeOrders] = useState<ChangeOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadChangeOrders = useCallback(async () => {
+    if (!projectId || !isDesktop) {
+      setChangeOrders([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const result = await db.listChangeOrders(projectId);
+      if (result.success && result.data) {
+        setChangeOrders(result.data);
+      } else {
+        setError(result.error || 'Failed to load change orders');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load change orders');
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId, db, isDesktop]);
+
+  useEffect(() => {
+    loadChangeOrders();
+  }, [loadChangeOrders]);
+
+  const createChangeOrder = useCallback(async (data: Partial<ChangeOrder>) => {
+    if (!projectId) return { success: false, error: 'No project selected' };
+    
+    const result = await db.createChangeOrder({ ...data, project_id: projectId });
+    if (result.success) {
+      await loadChangeOrders();
+    }
+    return result;
+  }, [projectId, db, loadChangeOrders]);
+
+  const updateChangeOrder = useCallback(async (id: string, data: Partial<ChangeOrder>) => {
+    const result = await db.updateChangeOrder(id, data);
+    if (result.success) {
+      await loadChangeOrders();
+    }
+    return result;
+  }, [db, loadChangeOrders]);
+
+  const deleteChangeOrder = useCallback(async (id: string, userId?: string) => {
+    const result = await db.deleteChangeOrder(id, userId);
+    if (result.success) {
+      await loadChangeOrders();
+    }
+    return result;
+  }, [db, loadChangeOrders]);
+
+  return {
+    changeOrders,
+    loading,
+    error,
+    createChangeOrder,
+    updateChangeOrder,
+    deleteChangeOrder,
+    reload: loadChangeOrders,
+  };
+}
+
+export function useContracts(projectId: string | undefined) {
+  const { db, isDesktop } = useDatabase();
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadContracts = useCallback(async () => {
+    if (!projectId || !isDesktop) {
+      setContracts([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const result = await db.listContracts(projectId);
+      if (result.success && result.data) {
+        setContracts(result.data);
+      } else {
+        setError(result.error || 'Failed to load contracts');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load contracts');
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId, db, isDesktop]);
+
+  useEffect(() => {
+    loadContracts();
+  }, [loadContracts]);
+
+  const createContract = useCallback(async (data: Partial<Contract>) => {
+    if (!projectId) return { success: false, error: 'No project selected' };
+    
+    const result = await db.createContract({ ...data, project_id: projectId });
+    if (result.success) {
+      await loadContracts();
+    }
+    return result;
+  }, [projectId, db, loadContracts]);
+
+  const updateContract = useCallback(async (id: string, data: Partial<Contract>) => {
+    const result = await db.updateContract(id, data);
+    if (result.success) {
+      await loadContracts();
+    }
+    return result;
+  }, [db, loadContracts]);
+
+  const deleteContract = useCallback(async (id: string, userId?: string) => {
+    const result = await db.deleteContract(id, userId);
+    if (result.success) {
+      await loadContracts();
+    }
+    return result;
+  }, [db, loadContracts]);
+
+  return {
+    contracts,
+    loading,
+    error,
+    createContract,
+    updateContract,
+    deleteContract,
+    reload: loadContracts,
+  };
+}
+
+export function useAutomatedSOV(projectId: string | undefined) {
+  const { db, isDesktop } = useDatabase();
+  const [sovItems, setSOVItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const calculateSOV = useCallback(async () => {
+    if (!projectId || !isDesktop) {
+      setSOVItems([]);
+      return { success: false, error: 'No project selected or not in desktop mode' };
+    }
+
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const result = await db.calculateAutomatedSOV(projectId);
+      if (result.success && result.data) {
+        setSOVItems(result.data);
+      } else {
+        setError(result.error || 'Failed to calculate SOV');
+      }
+      return result;
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Failed to calculate SOV';
+      setError(errorMsg);
+      return { success: false, error: errorMsg };
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId, db, isDesktop]);
+
+  return {
+    sovItems,
+    loading,
+    error,
+    calculateSOV,
   };
 }
