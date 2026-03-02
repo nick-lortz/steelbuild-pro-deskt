@@ -290,6 +290,82 @@ function createTablesIfNotExists() {
     
     CREATE INDEX IF NOT EXISTS idx_user_preferences_user_id ON user_preferences(user_id);
     CREATE INDEX IF NOT EXISTS idx_user_preferences_key ON user_preferences(user_id, preference_key);
+
+    CREATE TABLE IF NOT EXISTS production_notes (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      body TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'open',
+      priority TEXT NOT NULL DEFAULT 'medium',
+      category TEXT NOT NULL,
+      discipline TEXT NOT NULL DEFAULT 'structural',
+      assignee TEXT,
+      assignee_name TEXT,
+      created_by TEXT NOT NULL,
+      created_by_name TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      due_date TEXT,
+      blocked INTEGER NOT NULL DEFAULT 0,
+      blockers_json TEXT DEFAULT '[]',
+      work_package_id TEXT,
+      drawing_set_id TEXT,
+      drawing_sheet_id TEXT,
+      rfi_id TEXT,
+      change_order_id TEXT,
+      piece_mark TEXT,
+      tags_json TEXT DEFAULT '[]',
+      attachments_json TEXT DEFAULT '[]',
+      visibility TEXT NOT NULL DEFAULT 'internal',
+      resolution_summary TEXT,
+      resolved_at TEXT,
+      resolved_by TEXT,
+      deleted_at TEXT,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+      FOREIGN KEY (drawing_set_id) REFERENCES drawing_sets(id) ON DELETE SET NULL,
+      FOREIGN KEY (drawing_sheet_id) REFERENCES drawing_sheets(id) ON DELETE SET NULL,
+      FOREIGN KEY (rfi_id) REFERENCES rfis(id) ON DELETE SET NULL,
+      FOREIGN KEY (change_order_id) REFERENCES change_orders(id) ON DELETE SET NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_production_notes_project_id ON production_notes(project_id);
+    CREATE INDEX IF NOT EXISTS idx_production_notes_status ON production_notes(status);
+    CREATE INDEX IF NOT EXISTS idx_production_notes_priority ON production_notes(priority);
+    CREATE INDEX IF NOT EXISTS idx_production_notes_category ON production_notes(category);
+    CREATE INDEX IF NOT EXISTS idx_production_notes_assignee ON production_notes(assignee);
+    CREATE INDEX IF NOT EXISTS idx_production_notes_due_date ON production_notes(due_date);
+    CREATE INDEX IF NOT EXISTS idx_production_notes_created_at ON production_notes(created_at);
+
+    CREATE TABLE IF NOT EXISTS production_note_comments (
+      id TEXT PRIMARY KEY,
+      note_id TEXT NOT NULL,
+      body TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      created_by TEXT NOT NULL,
+      created_by_name TEXT,
+      mentions_json TEXT DEFAULT '[]',
+      FOREIGN KEY (note_id) REFERENCES production_notes(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_production_note_comments_note_id ON production_note_comments(note_id);
+    CREATE INDEX IF NOT EXISTS idx_production_note_comments_created_at ON production_note_comments(created_at);
+
+    CREATE TABLE IF NOT EXISTS production_note_audit_log (
+      id TEXT PRIMARY KEY,
+      note_id TEXT NOT NULL,
+      action TEXT NOT NULL,
+      field_changed TEXT,
+      old_value TEXT,
+      new_value TEXT,
+      changed_by TEXT NOT NULL,
+      changed_by_name TEXT,
+      changed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (note_id) REFERENCES production_notes(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_production_note_audit_log_note_id ON production_note_audit_log(note_id);
+    CREATE INDEX IF NOT EXISTS idx_production_note_audit_log_changed_at ON production_note_audit_log(changed_at);
   `);
   
   migrateSchema();

@@ -2061,6 +2061,447 @@ async function getPMADailyBrief(projectId) {
   };
 }
 
+async function createProductionNote(data) {
+  const sqliteDb = getSQLiteDB();
+  const id = uuidv4();
+  const now = new Date().toISOString();
+  
+  const blocked = (data.status === 'waiting_on' && data.blockers && data.blockers.length > 0) ? 1 : 0;
+  
+  const note = {
+    id,
+    project_id: data.project_id,
+    title: data.title,
+    body: data.body || '',
+    status: data.status || 'open',
+    priority: data.priority || 'medium',
+    category: data.category,
+    discipline: data.discipline || 'structural',
+    assignee: data.assignee || null,
+    assignee_name: data.assignee_name || null,
+    created_by: data.created_by,
+    created_by_name: data.created_by_name || null,
+    created_at: now,
+    updated_at: now,
+    due_date: data.due_date || null,
+    blocked,
+    blockers_json: JSON.stringify(data.blockers || []),
+    work_package_id: data.work_package_id || null,
+    drawing_set_id: data.drawing_set_id || null,
+    drawing_sheet_id: data.drawing_sheet_id || null,
+    rfi_id: data.rfi_id || null,
+    change_order_id: data.change_order_id || null,
+    piece_mark: data.piece_mark || null,
+    tags_json: JSON.stringify(data.tags || []),
+    attachments_json: JSON.stringify(data.attachments || []),
+    visibility: data.visibility || 'internal',
+    resolution_summary: null,
+    resolved_at: null,
+    resolved_by: null,
+    deleted_at: null
+  };
+  
+  sqliteDb.prepare(`
+    INSERT INTO production_notes (
+      id, project_id, title, body, status, priority, category, discipline,
+      assignee, assignee_name, created_by, created_by_name, created_at, updated_at,
+      due_date, blocked, blockers_json, work_package_id, drawing_set_id, drawing_sheet_id,
+      rfi_id, change_order_id, piece_mark, tags_json, attachments_json, visibility
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    note.id, note.project_id, note.title, note.body, note.status, note.priority,
+    note.category, note.discipline, note.assignee, note.assignee_name,
+    note.created_by, note.created_by_name, note.created_at, note.updated_at,
+    note.due_date, note.blocked, note.blockers_json, note.work_package_id,
+    note.drawing_set_id, note.drawing_sheet_id, note.rfi_id, note.change_order_id,
+    note.piece_mark, note.tags_json, note.attachments_json, note.visibility
+  );
+  
+  logAudit('production_note', id, 'create', data.project_id, note, data.created_by);
+  
+  const auditId = uuidv4();
+  sqliteDb.prepare(`
+    INSERT INTO production_note_audit_log (id, note_id, action, changed_by, changed_by_name, changed_at)
+    VALUES (?, ?, 'created', ?, ?, ?)
+  `).run(auditId, id, data.created_by, data.created_by_name, now);
+  
+  const resultNote = {
+    ...note,
+    blockers: JSON.parse(note.blockers_json),
+    tags: JSON.parse(note.tags_json),
+    attachments: JSON.parse(note.attachments_json),
+  };
+  delete resultNote.blockers_json;
+  delete resultNote.tags_json;
+  delete resultNote.attachments_json;
+  
+  return { success: true, data: resultNote };
+}
+
+async function listProductionNotes(projectId, options = {}) {
+  const sqliteDb = getSQLiteDB();
+  const { status, priority, category, discipline, assignee, search, limit = 100, offset = 0 } = options;
+  
+  let whereConditions = ['project_id = ?', 'deleted_at IS NULL'];
+  const params = [projectId];
+  
+  if (status) {
+    whereConditions.push('status = ?');
+    params.push(status);
+  }
+  
+  if (priority) {
+    whereConditions.push('priority = ?');
+    params.push(priority);
+  }
+  
+  if (category) {
+    whereConditions.push('category = ?');
+    params.push(category);
+  }
+  
+  if (discipline) {
+    whereConditions.push('discipline = ?');
+    params.push(discipline);
+  }
+  
+  if (assignee) {
+    whereConditions.push('assignee = ?');
+    params.push(assignee);
+  }
+  
+  if (search) {
+    whereConditions.push('(title LIKE ? OR body LIKE ? OR piece_mark LIKE ?)');
+    const searchPattern = `%${search}%`;
+    params.push(searchPattern, searchPattern, searchPattern);
+  }
+  
+  params.push(limit, offset);
+  
+  const query = `
+    SELECT * FROM production_notes 
+    WHERE ${whereConditions.join(' AND ')}
+    ORDER BY 
+      CASE priority 
+        WHEN 'critical' THEN 1 
+        WHEN 'high' THEN 2 
+        WHEN 'medium' THEN 3 
+        WHEN 'low' THEN 4 
+      END,
+      created_at DESC
+    LIMIT ? OFFSET ?
+  `;
+  
+  const results = sqliteDb.prepare(query).all(...params);
+  
+  const notes = results.map(note => ({
+    ...note,
+    blocked: Boolean(note.blocked),
+    blockers: JSON.parse(note.blockers_json || '[]'),
+    tags: JSON.parse(note.tags_json || '[]'),
+    attachments: JSON.parse(note.attachments_json || '[]'),
+  }));
+  
+  return { success: true, data: notes };
+}
+
+async function updateProductionNote(id, data) {
+  const sqliteDb = getSQLiteDB();
+  const now = new Date().toISOString();
+  
+  const existing = sqliteDb.prepare('SELECT * FROM production_notes WHERE id = ?').get(id);
+  if (!existing) {
+    return { success: false, error: 'Production note not found' };
+  }
+  
+  if (data.status === 'waiting_on') {
+    if (!data.blockers || data.blockers.length === 0) {
+      return { success: false, error: 'Blockers are required when setting status to "waiting_on"' };
+    }
+    data.blocked = 1;
+  } else if (data.status === 'resolved') {
+    if (!data.resolution_summary) {
+      return { success: false, error: 'Resolution summary is required when resolving a note' };
+    }
+    data.resolved_at = now;
+    data.resolved_by = data.updated_by || existing.created_by;
+    data.blocked = 0;
+  } else {
+    data.blocked = 0;
+  }
+  
+  const updateFields = [];
+  const values = [];
+  const auditChanges = [];
+  
+  const allowedFields = [
+    'title', 'body', 'status', 'priority', 'category', 'discipline',
+    'assignee', 'assignee_name', 'due_date', 'blocked',
+    'work_package_id', 'drawing_set_id', 'drawing_sheet_id',
+    'rfi_id', 'change_order_id', 'piece_mark', 'visibility',
+    'resolution_summary', 'resolved_at', 'resolved_by'
+  ];
+  
+  allowedFields.forEach(field => {
+    if (data[field] !== undefined) {
+      const dbField = field;
+      updateFields.push(`${dbField} = ?`);
+      values.push(data[field]);
+      
+      if (existing[dbField] !== data[field]) {
+        auditChanges.push({
+          field: field,
+          old_value: String(existing[dbField] || ''),
+          new_value: String(data[field] || '')
+        });
+      }
+    }
+  });
+  
+  if (data.blockers !== undefined) {
+    updateFields.push('blockers_json = ?');
+    values.push(JSON.stringify(data.blockers));
+    auditChanges.push({
+      field: 'blockers',
+      old_value: existing.blockers_json,
+      new_value: JSON.stringify(data.blockers)
+    });
+  }
+  
+  if (data.tags !== undefined) {
+    updateFields.push('tags_json = ?');
+    values.push(JSON.stringify(data.tags));
+  }
+  
+  if (data.attachments !== undefined) {
+    updateFields.push('attachments_json = ?');
+    values.push(JSON.stringify(data.attachments));
+  }
+  
+  updateFields.push('updated_at = ?');
+  values.push(now);
+  values.push(id);
+  
+  sqliteDb.prepare(`UPDATE production_notes SET ${updateFields.join(', ')} WHERE id = ?`).run(...values);
+  logAudit('production_note', id, 'update', existing.project_id, data, data.updated_by);
+  
+  for (const change of auditChanges) {
+    const auditId = uuidv4();
+    sqliteDb.prepare(`
+      INSERT INTO production_note_audit_log 
+      (id, note_id, action, field_changed, old_value, new_value, changed_by, changed_by_name, changed_at)
+      VALUES (?, ?, 'updated', ?, ?, ?, ?, ?, ?)
+    `).run(
+      auditId, id, change.field, change.old_value, change.new_value,
+      data.updated_by || existing.created_by,
+      data.updated_by_name || existing.created_by_name,
+      now
+    );
+  }
+  
+  return { success: true };
+}
+
+async function deleteProductionNote(id, userId) {
+  const sqliteDb = getSQLiteDB();
+  const now = new Date().toISOString();
+  
+  const existing = sqliteDb.prepare('SELECT * FROM production_notes WHERE id = ?').get(id);
+  if (!existing) {
+    return { success: false, error: 'Production note not found' };
+  }
+  
+  sqliteDb.prepare('UPDATE production_notes SET deleted_at = ?, updated_at = ? WHERE id = ?')
+    .run(now, now, id);
+  
+  logAudit('production_note', id, 'delete', existing.project_id, { soft_delete: true }, userId);
+  
+  const auditId = uuidv4();
+  sqliteDb.prepare(`
+    INSERT INTO production_note_audit_log (id, note_id, action, changed_by, changed_at)
+    VALUES (?, ?, 'deleted', ?, ?)
+  `).run(auditId, id, userId || existing.created_by, now);
+  
+  return { success: true };
+}
+
+async function restoreProductionNote(id, userId) {
+  const sqliteDb = getSQLiteDB();
+  const now = new Date().toISOString();
+  
+  const existing = sqliteDb.prepare('SELECT * FROM production_notes WHERE id = ?').get(id);
+  if (!existing) {
+    return { success: false, error: 'Production note not found' };
+  }
+  
+  if (!existing.deleted_at) {
+    return { success: false, error: 'Production note is not deleted' };
+  }
+  
+  sqliteDb.prepare('UPDATE production_notes SET deleted_at = NULL, updated_at = ? WHERE id = ?')
+    .run(now, id);
+  
+  logAudit('production_note', id, 'restore', existing.project_id, {}, userId);
+  
+  const auditId = uuidv4();
+  sqliteDb.prepare(`
+    INSERT INTO production_note_audit_log (id, note_id, action, changed_by, changed_at)
+    VALUES (?, ?, 'restored', ?, ?)
+  `).run(auditId, id, userId || existing.created_by, now);
+  
+  return { success: true };
+}
+
+async function addProductionNoteComment(noteId, body, userId, mentions) {
+  const sqliteDb = getSQLiteDB();
+  const id = uuidv4();
+  const now = new Date().toISOString();
+  
+  const note = sqliteDb.prepare('SELECT id, project_id FROM production_notes WHERE id = ?').get(noteId);
+  if (!note) {
+    return { success: false, error: 'Production note not found' };
+  }
+  
+  sqliteDb.prepare(`
+    INSERT INTO production_note_comments (id, note_id, body, created_at, created_by, mentions_json)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(id, noteId, body, now, userId, JSON.stringify(mentions || []));
+  
+  sqliteDb.prepare('UPDATE production_notes SET updated_at = ? WHERE id = ?').run(now, noteId);
+  
+  logAudit('production_note_comment', id, 'create', note.project_id, { note_id: noteId, body }, userId);
+  
+  const comment = {
+    id,
+    note_id: noteId,
+    body,
+    created_at: now,
+    created_by: userId,
+    mentions: mentions || []
+  };
+  
+  return { success: true, data: comment };
+}
+
+async function listProductionNoteComments(noteId) {
+  const sqliteDb = getSQLiteDB();
+  
+  const comments = sqliteDb.prepare(`
+    SELECT * FROM production_note_comments 
+    WHERE note_id = ?
+    ORDER BY created_at ASC
+  `).all(noteId);
+  
+  const result = comments.map(c => ({
+    ...c,
+    mentions: JSON.parse(c.mentions_json || '[]')
+  }));
+  
+  return { success: true, data: result };
+}
+
+async function getProductionNoteKPIs(projectId) {
+  const sqliteDb = getSQLiteDB();
+  
+  const openNotes = sqliteDb.prepare(`
+    SELECT COUNT(*) as count 
+    FROM production_notes 
+    WHERE project_id = ? AND status IN ('open', 'in_progress', 'waiting_on') AND deleted_at IS NULL
+  `).get(projectId);
+  
+  const pastDue = sqliteDb.prepare(`
+    SELECT COUNT(*) as count 
+    FROM production_notes 
+    WHERE project_id = ? 
+      AND status NOT IN ('resolved', 'closed') 
+      AND due_date IS NOT NULL 
+      AND due_date < date('now')
+      AND deleted_at IS NULL
+  `).get(projectId);
+  
+  const highCritical = sqliteDb.prepare(`
+    SELECT COUNT(*) as count 
+    FROM production_notes 
+    WHERE project_id = ? 
+      AND priority IN ('high', 'critical') 
+      AND status NOT IN ('resolved', 'closed')
+      AND deleted_at IS NULL
+  `).get(projectId);
+  
+  const blockers = sqliteDb.prepare(`
+    SELECT COUNT(*) as count 
+    FROM production_notes 
+    WHERE project_id = ? 
+      AND blocked = 1 
+      AND status = 'waiting_on'
+      AND deleted_at IS NULL
+  `).get(projectId);
+  
+  const byCategory = sqliteDb.prepare(`
+    SELECT category, COUNT(*) as count 
+    FROM production_notes 
+    WHERE project_id = ? 
+      AND status NOT IN ('resolved', 'closed')
+      AND deleted_at IS NULL
+    GROUP BY category
+  `).all(projectId);
+  
+  const categoryCounts = {};
+  byCategory.forEach(row => {
+    categoryCounts[row.category] = row.count;
+  });
+  
+  return {
+    success: true,
+    data: {
+      open_notes: openNotes?.count || 0,
+      past_due: pastDue?.count || 0,
+      high_critical: highCritical?.count || 0,
+      blockers: blockers?.count || 0,
+      by_category: categoryCounts
+    }
+  };
+}
+
+async function convertProductionNoteToRFI(noteId, userId) {
+  const sqliteDb = getSQLiteDB();
+  
+  const note = sqliteDb.prepare('SELECT * FROM production_notes WHERE id = ?').get(noteId);
+  if (!note) {
+    return { success: false, error: 'Production note not found' };
+  }
+  
+  const rfiData = {
+    project_id: note.project_id,
+    subject: note.title,
+    question: note.body,
+    status: 'open',
+    priority: note.priority,
+    created_by: userId,
+    updated_by: userId
+  };
+  
+  const rfiResult = await createRFI(rfiData);
+  
+  if (rfiResult.success) {
+    await updateProductionNote(noteId, {
+      rfi_id: rfiResult.data.id,
+      updated_by: userId
+    });
+    
+    const auditId = uuidv4();
+    const now = new Date().toISOString();
+    sqliteDb.prepare(`
+      INSERT INTO production_note_audit_log (id, note_id, action, new_value, changed_by, changed_at)
+      VALUES (?, ?, 'converted_to_rfi', ?, ?, ?)
+    `).run(auditId, noteId, rfiResult.data.id, userId, now);
+    
+    logAudit('production_note', noteId, 'convert-to-rfi', note.project_id, { rfi_id: rfiResult.data.id }, userId);
+  }
+  
+  return rfiResult;
+}
+
 module.exports = {
   createRFI,
   listRFIs,
@@ -2117,4 +2558,13 @@ module.exports = {
   computePortfolioMarginAtRisk,
   updateProject,
   listProjects,
+  createProductionNote,
+  listProductionNotes,
+  updateProductionNote,
+  deleteProductionNote,
+  restoreProductionNote,
+  addProductionNoteComment,
+  listProductionNoteComments,
+  getProductionNoteKPIs,
+  convertProductionNoteToRFI,
 };

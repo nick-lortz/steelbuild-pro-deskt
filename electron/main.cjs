@@ -58,6 +58,15 @@ const {
   computePortfolioMarginAtRisk,
   updateProject,
   listProjects,
+  createProductionNote,
+  listProductionNotes,
+  updateProductionNote,
+  deleteProductionNote,
+  restoreProductionNote,
+  addProductionNoteComment,
+  listProductionNoteComments,
+  getProductionNoteKPIs,
+  convertProductionNoteToRFI,
 } = require("./db/queries");
 
 const isDev = !app.isPackaged;
@@ -918,3 +927,74 @@ ipcMain.handle("db:listProjects", async (event, options) => {
   }
 });
 
+ipcMain.handle("db:createProductionNote", async (event, data) => {
+  try {
+    return await createProductionNote(data);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:listProductionNotes", async (event, projectId, options) => {
+  try {
+    return await listProductionNotes(projectId, options);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:updateProductionNote", async (event, id, data) => {
+  try {
+    return await updateProductionNote(id, data);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:deleteProductionNote", async (event, id, userId) => {
+  try {
+    return await deleteProductionNote(id, userId);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:restoreProductionNote", async (event, id, userId) => {
+  try {
+    return await restoreProductionNote(id, userId);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:addProductionNoteComment", async (event, noteId, body, userId, mentions) => {
+  try {
+    return await addProductionNoteComment(noteId, body, userId, mentions);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:listProductionNoteComments", async (event, noteId) => {
+  try {
+    return await listProductionNoteComments(noteId);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:getProductionNoteKPIs", async (event, projectId) => {
+  try {
+    return await getProductionNoteKPIs(projectId);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("db:convertProductionNoteToRFI", async (event, noteId, userId) => {
+  try {
+    return await convertProductionNoteToRFI(noteId, userId);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
