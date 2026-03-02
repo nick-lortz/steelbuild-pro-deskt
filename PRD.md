@@ -70,6 +70,27 @@ This is a multi-module construction ERP system with project hierarchies, cost tr
 - **Progression**: Open PMA Panel → Enter Query → LLM Analysis → Contextual Response → Suggested Actions
 - **Success criteria**: End-to-end functional, returns useful responses, handles loading/error states
 
+### Budget Tracking & Cost Forecasting
+- **Functionality**: Real-time budget analysis with AI-powered cost projections and variance tracking
+- **Purpose**: Proactive financial management, early warning of budget overruns
+- **Trigger**: User navigates to Budget Tracking page from project nav
+- **Progression**: Load Budget Data → Calculate Forecasts → Display Trends → Show Health Score → Cost Code Analysis
+- **Success criteria**: Accurate forecasts with confidence levels, clear visualizations, actionable alerts
+
+### SOV (Schedule of Values) Tracking
+- **Functionality**: Manage billing periods, line items, retainage, and payment applications
+- **Purpose**: Streamline client billing and track work completion percentages
+- **Trigger**: User navigates to SOV Tracking page, creates version or adds line items
+- **Progression**: Create Version → Add Line Items → Calculate Totals → Submit for Approval → Export for Billing
+- **Success criteria**: Accurate calculations, clear progress tracking, version history, export capability
+
+### Reporting & Analytics Dashboard
+- **Functionality**: Comprehensive project performance analytics with multi-dimensional KPIs
+- **Purpose**: Executive-level insights and data-driven decision making
+- **Trigger**: User navigates to Reporting & Analytics page
+- **Progression**: Generate Metrics → Display Performance Radar → Cost/Schedule/Quality Analysis → Trend Charts
+- **Success criteria**: Real-time calculations, interactive charts, export capability, clear performance indicators
+
 ## Edge Case Handling
 
 - **Empty States**: All lists show helpful "no data" messages with CTAs to create first item

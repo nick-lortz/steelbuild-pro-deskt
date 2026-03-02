@@ -16,6 +16,9 @@ import {
   Notebook,
   UsersFour,
   Gear,
+  TrendUp,
+  ChartLine,
+  ListChecks,
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -127,6 +130,24 @@ export function ProjectLayout() {
         </TabsList>
 
         <div className="flex gap-2 overflow-x-auto pb-2">
+          <Link to={`/projects/${projectId}/reporting`}>
+            <Button variant={activeTab === 'reporting' ? 'secondary' : 'outline'} size="sm" className="gap-2">
+              <ChartBar size={16} />
+              Analytics
+            </Button>
+          </Link>
+          <Link to={`/projects/${projectId}/budget-tracking`}>
+            <Button variant={activeTab === 'budget-tracking' ? 'secondary' : 'outline'} size="sm" className="gap-2">
+              <TrendUp size={16} />
+              Budget Forecast
+            </Button>
+          </Link>
+          <Link to={`/projects/${projectId}/sov-tracking`}>
+            <Button variant={activeTab === 'sov-tracking' ? 'secondary' : 'outline'} size="sm" className="gap-2">
+              <ListChecks size={16} />
+              SOV
+            </Button>
+          </Link>
           <Link to={`/projects/${projectId}/labor`}>
             <Button variant={activeTab === 'labor' ? 'secondary' : 'outline'} size="sm" className="gap-2">
               <Users size={16} />

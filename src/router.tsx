@@ -7,6 +7,9 @@ import { ProjectDashboardPage } from '@/pages/projects/project-dashboard-page'
 import { ProjectSettingsPage } from '@/pages/projects/project-settings-page'
 import { SchedulePage } from '@/pages/schedule/schedule-page'
 import { FinancialsPage } from '@/pages/financials/financials-page'
+import { BudgetTrackingPage } from '@/pages/financials/budget-tracking-page'
+import { SOVTrackingPage } from '@/pages/financials/sov-tracking-page'
+import { ReportingAnalyticsPage } from '@/pages/financials/reporting-analytics-page'
 import { RFIsPage } from '@/pages/rfis/rfis-page'
 import { DocumentsPage } from '@/pages/documents/documents-page'
 import { DrawingsPage } from '@/pages/drawings/drawings-page'
@@ -72,6 +75,18 @@ export const router = createBrowserRouter([
           {
             path: 'financials',
             element: <FinancialsPage />,
+          },
+          {
+            path: 'budget-tracking',
+            element: <BudgetTrackingPage />,
+          },
+          {
+            path: 'sov-tracking',
+            element: <SOVTrackingPage />,
+          },
+          {
+            path: 'reporting',
+            element: <ReportingAnalyticsPage />,
           },
           {
             path: 'rfis',

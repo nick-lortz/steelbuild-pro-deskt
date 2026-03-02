@@ -48,31 +48,36 @@ export interface ExpenseSplit {
 
 export interface SOVItem {
   id: string
-  sovVersionId: string
   projectId: string
-  itemNumber: string
+  versionId: string
+  lineNumber: number
   description: string
   scheduledValue: number
-  previouslyCompleted: number
-  thisPercentComplete: number
-  thisPeriodAmount: number
+  workCompleted: number
   materialsStored: number
   totalCompleted: number
+  percentComplete: number
+  retainage: number
+  previouslyBilled: number
+  currentBilling: number
   balance: number
-  order: number
+  costCodeId?: string
+  createdAt: string
+  updatedAt: string
 }
 
 export interface SOVVersion {
   id: string
   projectId: string
   versionNumber: number
-  effectiveDate: string
-  totalValue: number
-  notes?: string
-  submittedBy: string
-  approvedBy?: string
-  approvedDate?: string
+  periodStart: string
+  periodEnd: string
   status: 'draft' | 'submitted' | 'approved' | 'rejected'
+  submittedDate?: string
+  approvedDate?: string
+  submittedBy?: string
+  approvedBy?: string
+  notes?: string
   createdAt: string
 }
 
@@ -81,6 +86,7 @@ export interface SOVCostCodeMap {
   sovItemId: string
   costCodeId: string
   projectId: string
+  allocatedAmount: number
   percentage: number
   createdAt: string
 }

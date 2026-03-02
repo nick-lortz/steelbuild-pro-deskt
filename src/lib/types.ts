@@ -353,6 +353,7 @@ export interface Expense {
   vendor: string
   description: string
   status: 'pending' | 'approved' | 'paid' | 'rejected'
+  submittedBy: string
   receiptUrl?: string
   approvedBy?: string
   approvedDate?: string
@@ -536,4 +537,45 @@ export interface AuditEntry {
   timestamp: string
   changes: Record<string, { old: unknown; new: unknown }>
   projectId?: string
+}
+
+export interface BudgetForecast {
+  id: string
+  projectId: string
+  forecastDate: string
+  forecastMonth: string
+  costCodeId: string
+  projectedCost: number
+  actualToDate: number
+  estimatedCompletion: number
+  variance: number
+  confidenceLevel: 'low' | 'medium' | 'high'
+  methodology: 'historical' | 'regression' | 'earned-value' | 'manual'
+  notes?: string
+  createdAt: string
+}
+
+export interface ReportDefinition {
+  id: string
+  name: string
+  type: 'cost' | 'schedule' | 'productivity' | 'safety' | 'quality' | 'executive'
+  description?: string
+  filters: Record<string, unknown>
+  metrics: string[]
+  chartType?: 'line' | 'bar' | 'pie' | 'area' | 'scatter'
+  refreshInterval?: number
+  recipients?: string[]
+  createdBy: string
+  createdAt: string
+}
+
+export interface ReportSnapshot {
+  id: string
+  reportId: string
+  projectId?: string
+  generatedDate: string
+  data: Record<string, unknown>
+  summary: string
+  trends: Array<{ metric: string; direction: 'up' | 'down' | 'stable'; value: number }>
+  createdAt: string
 }
