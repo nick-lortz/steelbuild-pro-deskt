@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Buildings, Robot, ChartBar, Wrench, CurrencyDollar, ClipboardText, Gear } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { PMAPanel } from '@/components/pma/pma-panel'
+import { OfflineIndicator } from '@/components/shared/offline-indicator'
 
 export function MainLayout() {
   const [pmaOpen, setPmaOpen] = useState(false)
@@ -91,6 +92,7 @@ export function MainLayout() {
           </div>
           
           <div className="flex items-center gap-2">
+            <OfflineIndicator />
             <Link to="/settings">
               <Button
                 variant={isActive('/settings') ? 'secondary' : 'ghost'}
