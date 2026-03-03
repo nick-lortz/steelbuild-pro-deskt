@@ -81,302 +81,287 @@ export function DashboardPage() {
   ).length
 
   return (
-    <div className="space-y-8 animate-in">
+    <div className="space-y-6 animate-in">
       <div className="flex items-start justify-between">
         <div>
-          <h2 className="font-display text-4xl font-bold tracking-tight">Dashboard</h2>
-          <p className="text-muted-foreground mt-2 text-base">
-            Overview of your steel fabrication projects and operations
+          <h2 className="font-display text-2xl font-bold tracking-tight text-text uppercase">Control Tower</h2>
+          <p className="text-text-dim mt-1 text-sm tracking-wide">
+            Real-time operations overview
           </p>
         </div>
         {syncing && (
-          <Badge variant="secondary" className="gap-2 animate-pulse">
+          <div className="px-4 py-2 rounded-full bg-panel-bg-2 border border-panel-border text-text-dim text-xs uppercase tracking-wider flex items-center gap-2 animate-pulse">
             <ArrowsClockwise className="w-3.5 h-3.5 animate-spin" />
             Syncing...
-          </Badge>
+          </div>
         )}
       </div>
 
       {criticalAlerts > 0 && (
-        <Card className="border-destructive/50 bg-gradient-to-br from-destructive/10 via-destructive/5 to-transparent overflow-hidden relative">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-destructive/10 rounded-full blur-3xl" />
-          <CardHeader className="pb-3 relative">
-            <div className="flex items-center gap-2">
-              <div className="p-2 bg-destructive/10 rounded-lg">
-                <Warning className="w-5 h-5 text-destructive" weight="fill" />
-              </div>
-              <CardTitle className="text-destructive">Critical Alerts</CardTitle>
+        <div className="phoenix-panel p-6 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(255, 77, 77, 0.08), rgba(255, 77, 77, 0.03))' }}>
+          <div className="absolute top-0 right-0 w-32 h-32 bg-danger/20 rounded-full blur-3xl" />
+          <div className="relative flex items-start gap-4">
+            <div className="p-3 rounded-xl phoenix-glow" style={{ background: 'rgba(255, 90, 31, 0.15)' }}>
+              <Warning className="w-6 h-6 text-accent" weight="fill" />
             </div>
-          </CardHeader>
-          <CardContent className="relative">
-            <p className="text-sm text-foreground/80">
-              You have <span className="font-semibold text-destructive">{criticalAlerts}</span> critical alert{criticalAlerts !== 1 ? 's' : ''} requiring immediate attention.
-            </p>
-            <Link to="/alerts">
-              <Button variant="destructive" size="sm" className="mt-4 shadow-md hover:shadow-lg transition-shadow">
-                View Alerts
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-      )}
-
-      <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:scale-[1.02] border-border/50 construction-card steel-shadow group">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-            <CardTitle className="text-sm font-semibold text-muted-foreground">Active Projects</CardTitle>
-            <div className="p-2 bg-accent/10 rounded-lg group-hover:bg-accent/20 transition-colors">
-              <Buildings size={20} className="text-accent" weight="duotone" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="font-mono text-3xl font-bold tracking-tight">{activeProjects.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              of {projects.length} total projects
-            </p>
-            <Progress value={(activeProjects.length / Math.max(projects.length, 1)) * 100} className="mt-3 h-2" />
-          </CardContent>
-        </Card>
-
-        <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:scale-[1.02] border-border/50 construction-card steel-shadow group">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-            <CardTitle className="text-sm font-semibold text-muted-foreground">Contract Value</CardTitle>
-            <div className="p-2 bg-success/10 rounded-lg group-hover:bg-success/20 transition-colors">
-              <CurrencyDollar size={20} className="text-success" weight="duotone" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="font-mono text-3xl font-bold tracking-tight">
-              ${(totalContractValue / 1000000).toFixed(1)}M
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Across all projects
-            </p>
-            <div className="mt-3 flex items-center gap-1.5 text-xs font-medium text-success">
-              <TrendUp className="w-3.5 h-3.5" weight="bold" />
-              <span>Portfolio health</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:scale-[1.02] border-border/50 construction-card steel-shadow group">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-            <CardTitle className="text-sm font-semibold text-muted-foreground">Open RFIs</CardTitle>
-            <div className="p-2 bg-warning/10 rounded-lg group-hover:bg-warning/20 transition-colors">
-              <FileText size={20} className="text-warning" weight="duotone" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="font-mono text-3xl font-bold tracking-tight">{openRFIs}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Awaiting response
-            </p>
-            {openRFIs > 5 && (
-              <Badge variant="destructive" className="mt-3 shadow-sm">Action needed</Badge>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:scale-[1.02] border-border/50 construction-card steel-shadow group">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-            <CardTitle className="text-sm font-semibold text-muted-foreground">Overdue Tasks</CardTitle>
-            <div className="p-2 bg-destructive/10 rounded-lg group-hover:bg-destructive/20 transition-colors">
-              <Calendar size={20} className="text-destructive" weight="duotone" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="font-mono text-3xl font-bold tracking-tight text-destructive">{overdueTasks}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Behind schedule
-            </p>
-            {overdueTasks === 0 && (
-              <div className="mt-3 flex items-center gap-1.5 text-xs font-medium text-success">
-                <CheckCircle className="w-3.5 h-3.5" weight="fill" />
-                <span>On track</span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:scale-[1.02] border-border/50 construction-card steel-shadow group">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-            <CardTitle className="text-sm font-semibold text-muted-foreground">Equipment Fleet</CardTitle>
-            <div className="p-2 bg-accent/10 rounded-lg group-hover:bg-accent/20 transition-colors">
-              <Wrench size={20} className="text-accent" weight="duotone" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="font-mono text-3xl font-bold tracking-tight">{equipment.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Units in fleet
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:scale-[1.02] border-border/50 construction-card steel-shadow group">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-            <CardTitle className="text-sm font-semibold text-muted-foreground">Pending Checklists</CardTitle>
-            <div className="p-2 bg-accent/10 rounded-lg group-hover:bg-accent/20 transition-colors">
-              <ListChecks size={20} className="text-accent" weight="duotone" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="font-mono text-3xl font-bold tracking-tight">{pendingChecklists.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Require attention
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:scale-[1.02] border-border/50 construction-card steel-shadow group">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-            <CardTitle className="text-sm font-semibold text-muted-foreground">Pending Submittals</CardTitle>
-            <div className="p-2 bg-warning/10 rounded-lg group-hover:bg-warning/20 transition-colors">
-              <FileText size={20} className="text-warning" weight="duotone" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="font-mono text-3xl font-bold tracking-tight">{pendingSubmittals}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              In review
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:scale-[1.02] border-border/50 construction-card steel-shadow group">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-            <CardTitle className="text-sm font-semibold text-muted-foreground">Critical Alerts</CardTitle>
-            <div className="p-2 bg-destructive/10 rounded-lg group-hover:bg-destructive/20 transition-colors">
-              <Warning size={20} className="text-destructive" weight="duotone" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="font-mono text-3xl font-bold tracking-tight text-destructive">{criticalAlerts}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Immediate action
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card className="overflow-hidden border-border/50 hover:border-accent/50 transition-all duration-300 construction-card steel-shadow">
-          <CardHeader className="pb-4">
-            <CardTitle className="font-display text-xl">Quick Actions</CardTitle>
-            <CardDescription>Common tasks and operations</CardDescription>
-          </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-3">
-            <Link to="/projects">
-              <Button className="w-full justify-start gap-2 shadow-sm hover:shadow-md transition-all duration-200 hover:scale-[1.02]">
-                <Plus size={18} weight="bold" />
-                New Project
-              </Button>
-            </Link>
-            <Link to="/cost-codes">
-              <Button variant="outline" className="w-full justify-start gap-2 hover:bg-secondary/50 hover:border-accent/50 transition-all duration-200 hover:scale-[1.02]">
-                <CurrencyDollar size={18} weight="duotone" />
-                Cost Codes
-              </Button>
-            </Link>
-            <Link to="/equipment">
-              <Button variant="outline" className="w-full justify-start gap-2 hover:bg-secondary/50 hover:border-accent/50 transition-all duration-200 hover:scale-[1.02]">
-                <Wrench size={18} weight="duotone" />
-                Equipment
-              </Button>
-            </Link>
-            <Link to="/audit">
-              <Button variant="outline" className="w-full justify-start gap-2 hover:bg-secondary/50 hover:border-accent/50 transition-all duration-200 hover:scale-[1.02]">
-                <CheckCircle size={18} weight="duotone" />
-                Data Audit
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-
-        <Card className="overflow-hidden border-border/50 hover:border-accent/50 transition-all duration-300 construction-card steel-shadow">
-          <CardHeader className="pb-4">
-            <CardTitle className="font-display text-xl">System Health</CardTitle>
-            <CardDescription>Overall status indicators</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-              <span className="text-sm font-medium">Projects</span>
-              <Badge variant={activeProjects.length > 0 ? 'default' : 'secondary'} className="shadow-sm">
-                {activeProjects.length > 0 ? 'Active' : 'None'}
-              </Badge>
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-              <span className="text-sm font-medium">RFIs</span>
-              <Badge variant={openRFIs === 0 ? 'default' : openRFIs < 5 ? 'secondary' : 'destructive'} className="shadow-sm">
-                {openRFIs === 0 ? 'All clear' : `${openRFIs} open`}
-              </Badge>
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-              <span className="text-sm font-medium">Schedule</span>
-              <Badge variant={overdueTasks === 0 ? 'default' : 'destructive'} className="shadow-sm">
-                {overdueTasks === 0 ? 'On track' : `${overdueTasks} overdue`}
-              </Badge>
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-              <span className="text-sm font-medium">Alerts</span>
-              <Badge variant={criticalAlerts === 0 ? 'default' : 'destructive'} className="shadow-sm">
-                {criticalAlerts === 0 ? 'None' : `${criticalAlerts} critical`}
-              </Badge>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="overflow-hidden border-border/50 hover:border-border transition-colors">
-        <CardHeader className="pb-4">
-          <CardTitle className="text-xl">Recent Projects</CardTitle>
-          <CardDescription>Your most recently updated projects</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {activeProjects.length === 0 ? (
-            <div className="py-12 text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted/50 mb-4">
-                <Buildings size={32} className="text-muted-foreground" weight="duotone" />
-              </div>
-              <p className="text-muted-foreground mb-4">No active projects yet</p>
-              <Link to="/projects">
-                <Button variant="outline" size="sm" className="shadow-sm hover:shadow-md transition-shadow">
-                  Create your first project
-                </Button>
+            <div className="flex-1">
+              <h3 className="text-text font-bold text-sm uppercase tracking-wider mb-1">Critical Alerts</h3>
+              <p className="text-text-dim text-sm">
+                You have <span className="font-bold text-accent">{criticalAlerts}</span> critical alert{criticalAlerts !== 1 ? 's' : ''} requiring immediate attention.
+              </p>
+              <Link to="/alerts">
+                <button className="mt-4 px-4 py-2 rounded-xl bg-accent text-white font-medium text-xs uppercase tracking-wider phoenix-glow hover:bg-accent-2 transition-all">
+                  View Alerts
+                </button>
               </Link>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {activeProjects.slice(0, 5).map((project) => (
-                <Link
-                  key={project.id}
-                  to={`/projects/${project.id}`}
-                  className="block rounded-lg border border-border/50 p-4 transition-all hover:border-border hover:shadow-md hover:bg-muted/30"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-base mb-1">{project.name}</h3>
-                      <p className="text-sm text-muted-foreground font-mono">
-                        {project.number} • {project.client}
-                      </p>
-                    </div>
-                    <div className="text-right ml-4">
-                      <p className="font-bold text-lg">
-                        ${(project.contractValue / 1000).toFixed(0)}K
-                      </p>
-                      <Badge variant="secondary" className="capitalize text-xs mt-1">
-                        {project.status}
-                      </Badge>
-                    </div>
-                  </div>
-                </Link>
-              ))}
+          </div>
+        </div>
+      )}
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="phoenix-panel p-5 hover:shadow-2xl transition-all duration-300 group relative">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-text-mute text-xs font-bold uppercase tracking-widest">Active Projects</h3>
+            <div className="p-2.5 rounded-xl" style={{ background: 'rgba(255, 90, 31, 0.12)' }}>
+              <Buildings size={20} className="text-accent" weight="duotone" />
+            </div>
+          </div>
+          <div className="font-mono text-4xl font-bold tracking-tight text-text mb-1">{activeProjects.length}</div>
+          <p className="text-xs text-text-dim uppercase tracking-wider">
+            of {projects.length} total
+          </p>
+          <div className="mt-4 h-1.5 bg-panel-bg-2 rounded-full overflow-hidden">
+            <div 
+              className="h-full phoenix-gradient rounded-full transition-all duration-500" 
+              style={{ width: `${(activeProjects.length / Math.max(projects.length, 1)) * 100}%` }}
+            />
+          </div>
+        </div>
+
+        <div className="phoenix-panel p-5 hover:shadow-2xl transition-all duration-300 group relative">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-text-mute text-xs font-bold uppercase tracking-widest">Contract Value</h3>
+            <div className="p-2.5 rounded-xl" style={{ background: 'rgba(77, 214, 164, 0.12)' }}>
+              <CurrencyDollar size={20} className="text-success" weight="duotone" />
+            </div>
+          </div>
+          <div className="font-mono text-4xl font-bold tracking-tight text-text mb-1">
+            ${(totalContractValue / 1000000).toFixed(1)}M
+          </div>
+          <p className="text-xs text-text-dim uppercase tracking-wider">
+            Portfolio Total
+          </p>
+          <div className="mt-4 flex items-center gap-2 text-xs font-bold text-success uppercase tracking-wider">
+            <TrendUp className="w-4 h-4" weight="bold" />
+            <span>Healthy</span>
+          </div>
+        </div>
+
+        <div className="phoenix-panel p-5 hover:shadow-2xl transition-all duration-300 group relative">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-text-mute text-xs font-bold uppercase tracking-widest">Open RFIs</h3>
+            <div className="p-2.5 rounded-xl" style={{ background: 'rgba(255, 177, 90, 0.12)' }}>
+              <FileText size={20} className="text-warning" weight="duotone" />
+            </div>
+          </div>
+          <div className="font-mono text-4xl font-bold tracking-tight text-text mb-1">{openRFIs}</div>
+          <p className="text-xs text-text-dim uppercase tracking-wider">
+            Awaiting Response
+          </p>
+          {openRFIs > 5 && (
+            <div className="mt-4 px-3 py-1 rounded-full bg-danger/15 text-danger text-xs font-bold uppercase tracking-wider inline-block">
+              Action Needed
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+
+        <div className="phoenix-panel p-5 hover:shadow-2xl transition-all duration-300 group relative">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-text-mute text-xs font-bold uppercase tracking-widest">Overdue Tasks</h3>
+            <div className="p-2.5 rounded-xl" style={{ background: 'rgba(255, 77, 77, 0.12)' }}>
+              <Calendar size={20} className="text-danger" weight="duotone" />
+            </div>
+          </div>
+          <div className="font-mono text-4xl font-bold tracking-tight text-danger mb-1">{overdueTasks}</div>
+          <p className="text-xs text-text-dim uppercase tracking-wider">
+            Behind Schedule
+          </p>
+          {overdueTasks === 0 && (
+            <div className="mt-4 flex items-center gap-2 text-xs font-bold text-success uppercase tracking-wider">
+              <CheckCircle className="w-4 h-4" weight="fill" />
+              <span>On Track</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="phoenix-panel p-5 hover:shadow-2xl transition-all duration-300 group">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-text-mute text-xs font-bold uppercase tracking-widest">Equipment Fleet</h3>
+            <div className="p-2.5 rounded-xl" style={{ background: 'rgba(255, 90, 31, 0.12)' }}>
+              <Wrench size={20} className="text-accent" weight="duotone" />
+            </div>
+          </div>
+          <div className="font-mono text-4xl font-bold tracking-tight text-text mb-1">{equipment.length}</div>
+          <p className="text-xs text-text-dim uppercase tracking-wider">
+            Units in Fleet
+          </p>
+        </div>
+
+        <div className="phoenix-panel p-5 hover:shadow-2xl transition-all duration-300 group">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-text-mute text-xs font-bold uppercase tracking-widest">Pending Checklists</h3>
+            <div className="p-2.5 rounded-xl" style={{ background: 'rgba(255, 90, 31, 0.12)' }}>
+              <ListChecks size={20} className="text-accent" weight="duotone" />
+            </div>
+          </div>
+          <div className="font-mono text-4xl font-bold tracking-tight text-text mb-1">{pendingChecklists.length}</div>
+          <p className="text-xs text-text-dim uppercase tracking-wider">
+            Require Attention
+          </p>
+        </div>
+
+        <div className="phoenix-panel p-5 hover:shadow-2xl transition-all duration-300 group">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-text-mute text-xs font-bold uppercase tracking-widest">Pending Submittals</h3>
+            <div className="p-2.5 rounded-xl" style={{ background: 'rgba(255, 177, 90, 0.12)' }}>
+              <FileText size={20} className="text-warning" weight="duotone" />
+            </div>
+          </div>
+          <div className="font-mono text-4xl font-bold tracking-tight text-text mb-1">{pendingSubmittals}</div>
+          <p className="text-xs text-text-dim uppercase tracking-wider">
+            In Review
+          </p>
+        </div>
+
+        <div className="phoenix-panel p-5 hover:shadow-2xl transition-all duration-300 group">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-text-mute text-xs font-bold uppercase tracking-widest">Critical Alerts</h3>
+            <div className="p-2.5 rounded-xl" style={{ background: 'rgba(255, 77, 77, 0.12)' }}>
+              <Warning size={20} className="text-danger" weight="duotone" />
+            </div>
+          </div>
+          <div className="font-mono text-4xl font-bold tracking-tight text-danger mb-1">{criticalAlerts}</div>
+          <p className="text-xs text-text-dim uppercase tracking-wider">
+            Immediate Action
+          </p>
+        </div>
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        <div className="phoenix-panel p-6 phoenix-dot-pattern">
+          <h3 className="font-display text-lg font-bold text-text uppercase tracking-wider mb-4">Quick Actions</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <Link to="/projects">
+              <button className="w-full px-4 py-3 rounded-xl bg-accent text-white font-medium text-sm uppercase tracking-wider phoenix-glow hover:bg-accent-2 transition-all flex items-center justify-center gap-2">
+                <Plus size={18} weight="bold" />
+                New Project
+              </button>
+            </Link>
+            <Link to="/cost-codes">
+              <button className="w-full px-4 py-3 rounded-xl bg-panel-bg-2 text-text-dim font-medium text-sm uppercase tracking-wider hover:text-text hover:bg-panel-bg-2/80 transition-all flex items-center justify-center gap-2 border border-panel-border">
+                <CurrencyDollar size={18} weight="duotone" />
+                Cost Codes
+              </button>
+            </Link>
+            <Link to="/equipment">
+              <button className="w-full px-4 py-3 rounded-xl bg-panel-bg-2 text-text-dim font-medium text-sm uppercase tracking-wider hover:text-text hover:bg-panel-bg-2/80 transition-all flex items-center justify-center gap-2 border border-panel-border">
+                <Wrench size={18} weight="duotone" />
+                Equipment
+              </button>
+            </Link>
+            <Link to="/audit">
+              <button className="w-full px-4 py-3 rounded-xl bg-panel-bg-2 text-text-dim font-medium text-sm uppercase tracking-wider hover:text-text hover:bg-panel-bg-2/80 transition-all flex items-center justify-center gap-2 border border-panel-border">
+                <CheckCircle size={18} weight="duotone" />
+                Data Audit
+              </button>
+            </Link>
+          </div>
+        </div>
+
+        <div className="phoenix-panel p-6">
+          <h3 className="font-display text-lg font-bold text-text uppercase tracking-wider mb-4">System Health</h3>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between p-4 rounded-xl bg-panel-bg-2">
+              <span className="text-sm font-medium text-text-dim uppercase tracking-wider">Projects</span>
+              <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${activeProjects.length > 0 ? 'bg-success/15 text-success' : 'bg-panel-bg text-text-mute'}`}>
+                {activeProjects.length > 0 ? 'Active' : 'None'}
+              </div>
+            </div>
+            <div className="flex items-center justify-between p-4 rounded-xl bg-panel-bg-2">
+              <span className="text-sm font-medium text-text-dim uppercase tracking-wider">RFIs</span>
+              <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${openRFIs === 0 ? 'bg-success/15 text-success' : openRFIs < 5 ? 'bg-warning/15 text-warning' : 'bg-danger/15 text-danger'}`}>
+                {openRFIs === 0 ? 'All clear' : `${openRFIs} open`}
+              </div>
+            </div>
+            <div className="flex items-center justify-between p-4 rounded-xl bg-panel-bg-2">
+              <span className="text-sm font-medium text-text-dim uppercase tracking-wider">Schedule</span>
+              <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${overdueTasks === 0 ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'}`}>
+                {overdueTasks === 0 ? 'On track' : `${overdueTasks} overdue`}
+              </div>
+            </div>
+            <div className="flex items-center justify-between p-4 rounded-xl bg-panel-bg-2">
+              <span className="text-sm font-medium text-text-dim uppercase tracking-wider">Alerts</span>
+              <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${criticalAlerts === 0 ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'}`}>
+                {criticalAlerts === 0 ? 'None' : `${criticalAlerts} critical`}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="phoenix-panel p-6">
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="font-display text-lg font-bold text-text uppercase tracking-wider">Recent Projects</h3>
+          <Link to="/projects">
+            <button className="text-xs font-bold uppercase tracking-wider text-accent hover:text-accent-2 transition-colors">
+              View All →
+            </button>
+          </Link>
+        </div>
+        {activeProjects.length === 0 ? (
+          <div className="py-16 text-center">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-panel-bg-2 mb-4">
+              <Buildings size={40} className="text-text-mute" weight="duotone" />
+            </div>
+            <p className="text-text-dim text-sm uppercase tracking-wider mb-6">No active projects yet</p>
+            <Link to="/projects">
+              <button className="px-5 py-2.5 rounded-xl bg-accent text-white font-medium text-xs uppercase tracking-wider phoenix-glow hover:bg-accent-2 transition-all">
+                Create First Project
+              </button>
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {activeProjects.slice(0, 5).map((project) => (
+              <Link
+                key={project.id}
+                to={`/projects/${project.id}`}
+                className="block rounded-xl border border-panel-border p-5 transition-all hover:border-accent/30 hover:bg-panel-bg-2 group"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <h3 className="font-bold text-base mb-1 text-text group-hover:text-accent transition-colors">{project.name}</h3>
+                    <p className="text-sm text-text-dim font-mono uppercase tracking-wider">
+                      {project.number} • {project.client}
+                    </p>
+                  </div>
+                  <div className="text-right ml-4">
+                    <p className="font-mono font-bold text-lg text-text">
+                      ${(project.contractValue / 1000).toFixed(0)}K
+                    </p>
+                    <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mt-1 inline-block ${project.status === 'active' ? 'bg-success/15 text-success' : 'bg-panel-bg-2 text-text-mute'}`}>
+                      {project.status}
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
