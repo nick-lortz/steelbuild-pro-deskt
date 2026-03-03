@@ -49,6 +49,7 @@ import { PMADailyBriefPage } from '@/pages/projects/pma-daily-brief-page'
 import { DetailingPage } from '@/pages/detailing/detailing-page'
 import { WorkflowDashboardPage } from '@/pages/workflow/workflow-dashboard-page'
 import DataRecoveryPage from '@/pages/data-recovery'
+import DataManagementPage from '@/pages/data-management'
 
 export const router = createBrowserRouter([
   {
@@ -90,6 +91,10 @@ export const router = createBrowserRouter([
       {
         path: 'data-recovery',
         element: <DataRecoveryPage />,
+      },
+      {
+        path: 'data-management',
+        element: <DataManagementPage />,
       },
       {
         path: 'settings',
