@@ -19,6 +19,9 @@ import {
   ArrowsClockwise,
   Funnel,
   DownloadSimple,
+  Plus,
+  PencilSimple,
+  Check,
 } from '@phosphor-icons/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -28,6 +31,10 @@ import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
 import type { FabWorkPackage, FabItem, FabBlocker } from '@/lib/types-fab'
 import type { WorkPackage, Delivery } from '@/lib/types'
@@ -48,7 +55,7 @@ export function WorkPackageReadinessPage() {
   const { projectId } = useParams<{ projectId: string }>()
   const navigate = useNavigate()
 
-  const [fabPackages] = useKV<FabWorkPackage[]>(`fab-packages-${projectId}`, [])
+  const [fabPackages, setFabPackages] = useKV<FabWorkPackage[]>(`fab-packages-${projectId}`, [])
   const [workPackages] = useKV<WorkPackage[]>(`work-packages-${projectId}`, [])
   const [fabItems] = useKV<FabItem[]>(`fab-items-${projectId}`, [])
   const [deliveries] = useKV<Delivery[]>(`deliveries-${projectId}`, [])
@@ -56,6 +63,8 @@ export function WorkPackageReadinessPage() {
   const [selectedPackageId, setSelectedPackageId] = useState<string>('')
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [viewMode, setViewMode] = useState<'grid' | 'dependencies' | 'timeline'>('grid')
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [editingReadinessType, setEditingReadinessType] = useState<'detailing' | 'material' | 'production' | 'delivery'>('detailing')
 
   const selectedPackage = useMemo(() => {
     return fabPackages.find(p => p.id === selectedPackageId)
@@ -239,6 +248,112 @@ export function WorkPackageReadinessPage() {
 
   const exportReadinessReport = () => {
     toast.success('Readiness report exported')
+  }
+
+  const handleToggleReadinessItem = (itemId: string) => {
+    if (!selectedPackage) return
+
+    const readinessKey = `${editingReadinessType}Readiness` as keyof FabWorkPackage
+    const readiness = selectedPackage[readinessKey] as any
+
+    const updatedItems = readiness.requiredItems.map((item: any) => {
+      if (item.id === itemId) {
+        return {
+          ...item,
+          completed: !item.completed,
+          completedDate: !item.completed ? new Date().toISOString() : null,
+        }
+      }
+      return item
+    })
+
+    const completedCount = updatedItems.filter((i: any) => i.completed).length
+    const totalCount = updatedItems.length
+    const readinessPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
+
+    const updatedReadiness = {
+      ...readiness,
+      requiredItems: updatedItems,
+      readinessPercent,
+      isReady: readinessPercent >= 100,
+    }
+
+    const updatedPackage = {
+      ...selectedPackage,
+      [readinessKey]: updatedReadiness,
+    }
+
+    const allReadiness = [
+      updatedPackage.detailingReadiness.readinessPercent,
+      updatedPackage.materialReadiness.readinessPercent,
+      updatedPackage.productionReadiness.readinessPercent,
+      updatedPackage.deliveryReadiness.readinessPercent,
+    ]
+    const overallProgress = Math.round(allReadiness.reduce((sum, val) => sum + val, 0) / 4)
+
+    let overallStatus = 'not-ready'
+    if (overallProgress >= 100) overallStatus = 'completed'
+    else if (overallProgress >= 75) overallStatus = 'ready'
+    else if (overallProgress >= 50) overallStatus = 'partially-ready'
+    else if (overallProgress > 0) overallStatus = 'in-progress'
+
+    updatedPackage.overallProgress = overallProgress
+    updatedPackage.overallStatus = overallStatus
+
+    setFabPackages((current) =>
+      current.map((pkg) => (pkg.id === selectedPackage.id ? updatedPackage : pkg))
+    )
+
+    toast.success('Readiness item updated')
+  }
+
+  const handleResolveBlocker = (blockerId: string) => {
+    if (!selectedPackage) return
+
+    const readinessKey = `${editingReadinessType}Readiness` as keyof FabWorkPackage
+    const readiness = selectedPackage[readinessKey] as any
+
+    const updatedBlockers = readiness.blockers.map((blocker: FabBlocker) => {
+      if (blocker.id === blockerId) {
+        return {
+          ...blocker,
+          status: 'resolved',
+          resolvedDate: new Date().toISOString(),
+        }
+      }
+      return blocker
+    })
+
+    const updatedReadiness = {
+      ...readiness,
+      blockers: updatedBlockers,
+    }
+
+    const updatedPackage = {
+      ...selectedPackage,
+      [readinessKey]: updatedReadiness,
+    }
+
+    setFabPackages((current) =>
+      current.map((pkg) => (pkg.id === selectedPackage.id ? updatedPackage : pkg))
+    )
+
+    toast.success('Blocker resolved')
+  }
+
+  const handleUpdatePackageStatus = (newStatus: string) => {
+    if (!selectedPackage) return
+
+    const updatedPackage = {
+      ...selectedPackage,
+      overallStatus: newStatus,
+    }
+
+    setFabPackages((current) =>
+      current.map((pkg) => (pkg.id === selectedPackage.id ? updatedPackage : pkg))
+    )
+
+    toast.success(`Package status updated to ${newStatus}`)
   }
 
   if (fabPackages.length === 0) {
@@ -752,7 +867,7 @@ export function WorkPackageReadinessPage() {
         <Card className="border-primary/50">
           <CardHeader>
             <div className="flex items-start justify-between">
-              <div>
+              <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-sm font-mono font-semibold text-muted-foreground">
                     {selectedPackage.packageNumber}
@@ -766,9 +881,26 @@ export function WorkPackageReadinessPage() {
                   <CardDescription className="mt-2">{selectedPackage.description}</CardDescription>
                 )}
               </div>
-              <Button variant="ghost" size="sm" onClick={() => setSelectedPackageId('')}>
-                <X size={16} />
-              </Button>
+              <div className="flex gap-2">
+                <Select
+                  value={selectedPackage.overallStatus}
+                  onValueChange={handleUpdatePackageStatus}
+                >
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="not-ready">Not Ready</SelectItem>
+                    <SelectItem value="partially-ready">Partially Ready</SelectItem>
+                    <SelectItem value="ready">Ready</SelectItem>
+                    <SelectItem value="in-progress">In Progress</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button variant="ghost" size="sm" onClick={() => setSelectedPackageId('')}>
+                  <X size={16} />
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -916,21 +1048,45 @@ export function WorkPackageReadinessPage() {
                   <TabsContent key={category} value={category} className="space-y-4">
                     {readiness.requiredItems.length > 0 && (
                       <div>
-                        <h4 className="text-sm font-semibold mb-3">Required Items</h4>
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="text-sm font-semibold">Required Items</h4>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setEditingReadinessType(category as any)
+                              setEditDialogOpen(true)
+                            }}
+                          >
+                            <PencilSimple size={14} className="mr-1" />
+                            Edit
+                          </Button>
+                        </div>
                         <div className="space-y-2">
                           {readiness.requiredItems.map((item: any) => (
                             <div
                               key={item.id}
-                              className="flex items-start gap-3 p-3 border rounded-lg bg-card"
+                              className="flex items-start gap-3 p-3 border rounded-lg bg-card hover:bg-muted/50 transition-colors cursor-pointer"
+                              onClick={() => {
+                                setEditingReadinessType(category as any)
+                                handleToggleReadinessItem(item.id)
+                              }}
                             >
-                              {item.completed ? (
-                                <CheckCircle size={18} className="text-accent mt-0.5" weight="fill" />
-                              ) : (
-                                <Clock size={18} className="text-muted-foreground mt-0.5" />
-                              )}
+                              <div className="flex items-center pt-0.5">
+                                <Checkbox
+                                  checked={item.completed}
+                                  onCheckedChange={() => {
+                                    setEditingReadinessType(category as any)
+                                    handleToggleReadinessItem(item.id)
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              </div>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2">
-                                  <span className="text-sm font-medium">{item.description}</span>
+                                  <span className={`text-sm font-medium ${item.completed ? 'line-through text-muted-foreground' : ''}`}>
+                                    {item.description}
+                                  </span>
                                   {item.required && (
                                     <Badge variant="outline" className="text-xs">
                                       Required
@@ -1004,6 +1160,17 @@ export function WorkPackageReadinessPage() {
                                       </p>
                                     )}
                                   </div>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      setEditingReadinessType(category as any)
+                                      handleResolveBlocker(blocker.id)
+                                    }}
+                                  >
+                                    <Check size={14} className="mr-1" />
+                                    Resolve
+                                  </Button>
                                 </div>
                               </div>
                             ))}
