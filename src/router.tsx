@@ -3,9 +3,11 @@ import { MainLayout } from '@/components/layouts/main-layout'
 import { ProjectLayout } from '@/components/layouts/project-layout'
 import { DashboardPage } from '@/pages/dashboard'
 import { ProjectsListPage } from '@/pages/projects/projects-list-page'
+import { ProjectsKPIPage } from '@/pages/projects/projects-kpi-page'
 import { ProjectDashboardPage } from '@/pages/projects/project-dashboard-page'
 import { ProjectSettingsPage } from '@/pages/projects/project-settings-page'
 import { SchedulePage } from '@/pages/schedule/schedule-page'
+import { ModernSchedulePage } from '@/pages/schedule/modern-schedule-page'
 import { FinancialsPage } from '@/pages/financials/financials-page'
 import { BudgetTrackingPage } from '@/pages/financials/budget-tracking-page'
 import { SOVTrackingPage } from '@/pages/financials/sov-tracking-page'
@@ -56,6 +58,10 @@ export const router = createBrowserRouter([
       },
       {
         path: 'projects',
+        element: <ProjectsKPIPage />,
+      },
+      {
+        path: 'projects-list',
         element: <ProjectsListPage />,
       },
       {
@@ -96,6 +102,10 @@ export const router = createBrowserRouter([
           },
           {
             path: 'schedule',
+            element: <ModernSchedulePage />,
+          },
+          {
+            path: 'schedule-classic',
             element: <SchedulePage />,
           },
           {
