@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Buildings,
@@ -11,6 +11,18 @@ import {
   TrendDown,
   User,
   Calendar,
+  ArrowRight,
+  Gauge,
+  Package,
+  FileText,
+  ArrowsClockwise,
+  FunnelSimple,
+  Funnel,
+  CaretDown,
+  Target,
+  ChartLineUp,
+  Shield,
+  ListChecks,
 } from '@phosphor-icons/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -21,6 +33,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useKV } from '@github/spark/hooks'
 import { useDatabase } from '@/hooks/use-database'
+import { projectsDb, rfisDb } from '@/lib/db'
 import {
   BarChart,
   Bar,
@@ -35,116 +48,242 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  AreaChart,
+  Area,
+  Scatter,
+  ScatterChart,
+  ZAxis,
+  ComposedChart,
 } from 'recharts'
-import type { Project, Budget, Task, RFI, ProjectRisk } from '@/lib/types'
+import type { Project, Task, RFI, CostCode, ChangeOrder, Submittal, WorkPackage } from '@/lib/types'
+import { cn } from '@/lib/utils'
 
 interface PortfolioMetrics {
   totalProjects: number
   activeProjects: number
+  planningProjects: number
+  completedProjects: number
   totalValue: number
+  totalSpent: number
+  totalMargin: number
+  marginPercent: number
   atRiskProjects: number
+  criticalProjects: number
+  warningProjects: number
+  healthyProjects: number
   onScheduleProjects: number
   underBudgetProjects: number
-  totalBudget: number
-  totalSpent: number
-  utilizationRate: number
   avgScheduleHealth: number
-  totalRisks: number
-  highRisks: number
+  totalOverdueTasks: number
+  totalActiveTasks: number
+  totalOpenRFIs: number
+  totalAgingRFIs: number
+  totalPendingSubmittals: number
+  totalActivePackages: number
+  totalOverBudgetCodes: number
+  utilizationRate: number
+  avgMarginPercent: number
 }
 
 interface ProjectHealth {
   project_id: string
   project_number: string
   project_name: string
-  status: string
+  client: string
+  status: 'planning' | 'active' | 'onhold' | 'completed'
   contract_value: number
   actual_cost: number
   margin: number
   margin_percent: number
+  budget_total: number
   approved_change_orders: number
   change_order_total: number
   open_rfis: number
   aging_rfis: number
   over_budget_cost_codes: number
-  slipping_tasks: number
-  total_risk_flags: number
+  total_tasks: number
+  completed_tasks: number
+  overdue_tasks: number
+  schedule_health: number
+  pending_submittals: number
+  active_packages: number
   health_status: 'healthy' | 'warning' | 'critical'
+  health_score: number
+  risk_level: 'low' | 'medium' | 'high'
 }
 
 export function PortfolioPulsePage() {
   const navigate = useNavigate()
   const { isDesktop, db } = useDatabase()
-  const [projects] = useKV<Project[]>('projects', [])
+  const [allProjects, setAllProjects] = useState<Project[]>([])
+  const [allRFIs, setAllRFIs] = useState<RFI[]>([])
+  const [allTasks] = useKV<Task[]>('all-tasks', [])
+  const [allCostCodes] = useKV<CostCode[]>('global-cost-codes', [])
+  const [allChangeOrders] = useKV<ChangeOrder[]>('change-orders', [])
+  const [allSubmittals] = useKV<Submittal[]>('submittals', [])
+  const [allWorkPackages] = useKV<WorkPackage[]>('work-packages', [])
   const [metrics, setMetrics] = useState<PortfolioMetrics | null>(null)
   const [projectHealthData, setProjectHealthData] = useState<ProjectHealth[]>([])
   const [loading, setLoading] = useState(true)
+  const [syncing, setSyncing] = useState(false)
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [healthFilter, setHealthFilter] = useState<string>('all')
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  useEffect(() => {
+    async function loadData() {
+      setSyncing(true)
+      try {
+        const [projectsData, rfisData] = await Promise.all([
+          projectsDb.getAll(),
+          rfisDb.getAll(),
+        ])
+        setAllProjects(projectsData)
+        setAllRFIs(rfisData)
+      } finally {
+        setSyncing(false)
+      }
+    }
+    loadData()
+  }, [refreshKey])
+
+  useEffect(() => {
+    const handleDataChange = () => {
+      setRefreshKey(prev => prev + 1)
+    }
+    window.addEventListener('dataUpdated', handleDataChange)
+    return () => window.removeEventListener('dataUpdated', handleDataChange)
+  }, [])
 
   useEffect(() => {
     async function calculatePortfolioMetrics() {
-      if (!projects || projects.length === 0) {
+      if (!allProjects || allProjects.length === 0) {
         setLoading(false)
         return
       }
 
-      if (isDesktop && projects.length > 0) {
-        const projectIds = projects.map(p => p.id)
-        const result = await db.computePortfolioMarginAtRisk(projectIds)
-        
-        if (result.success && result.data) {
-          setProjectHealthData(result.data)
-          
-          const activeProjects = result.data.filter(p => p.status === 'active')
-          const totalValue = result.data.reduce((sum, p) => sum + p.contract_value, 0)
-          const totalSpent = result.data.reduce((sum, p) => sum + p.actual_cost, 0)
-          const atRiskProjects = result.data.filter(p => p.health_status === 'critical' || p.health_status === 'warning').length
-          const onScheduleProjects = result.data.filter(p => p.slipping_tasks === 0).length
-          const underBudgetProjects = result.data.filter(p => p.over_budget_cost_codes === 0).length
-          const totalRiskFlags = result.data.reduce((sum, p) => sum + p.total_risk_flags, 0)
-          const highRisks = result.data.filter(p => p.health_status === 'critical').length
-          
-          setMetrics({
-            totalProjects: projects.length,
-            activeProjects: activeProjects.length,
-            totalValue,
-            atRiskProjects,
-            onScheduleProjects,
-            underBudgetProjects,
-            totalBudget: totalValue,
-            totalSpent,
-            utilizationRate: (activeProjects.length / Math.max(projects.length, 1)) * 100,
-            avgScheduleHealth: result.data.length > 0 
-              ? result.data.reduce((sum, p) => sum + (100 - (p.slipping_tasks * 10)), 0) / result.data.length
-              : 0,
-            totalRisks: totalRiskFlags,
-            highRisks,
-          })
+      const healthData: ProjectHealth[] = allProjects.map(project => {
+        const projectTasks = (allTasks || []).filter(t => t.projectId === project.id)
+        const projectRFIs = allRFIs.filter(r => r.projectId === project.id)
+        const projectCostCodes = (allCostCodes || []).filter(cc => cc.projectId === project.id)
+        const projectChangeOrders = (allChangeOrders || []).filter(co => co.projectId === project.id && co.status === 'approved')
+        const projectSubmittals = (allSubmittals || []).filter(s => s.projectId === project.id)
+        const projectPackages = (allWorkPackages || []).filter(wp => wp.projectId === project.id)
+
+        const totalTasks = projectTasks.length
+        const completedTasks = projectTasks.filter(t => t.status === 'completed').length
+        const overdueTasks = projectTasks.filter(t => 
+          t.status !== 'completed' && t.endDate && new Date(t.endDate) < new Date()
+        ).length
+
+        const openRFIs = projectRFIs.filter(r => r.status === 'open').length
+        const agingRFIs = projectRFIs.filter(r => {
+          if (r.status !== 'open') return false
+          const age = Date.now() - new Date(r.createdAt).getTime()
+          return age > 72 * 60 * 60 * 1000
+        }).length
+
+        const budgetTotal = projectCostCodes.reduce((sum, cc) => sum + (cc.budgetAmount || 0), 0)
+        const actualTotal = projectCostCodes.reduce((sum, cc) => sum + (cc.actualAmount || 0), 0)
+        const overBudgetCodes = projectCostCodes.filter(cc => 
+          cc.actualAmount && cc.budgetAmount && cc.actualAmount > cc.budgetAmount
+        ).length
+
+        const changeOrderTotal = projectChangeOrders.reduce((sum, co) => sum + (co.total || 0), 0)
+        const contractValue = project.contractValue + changeOrderTotal
+        const margin = contractValue - actualTotal
+        const marginPercent = contractValue > 0 ? (margin / contractValue) * 100 : 0
+
+        const scheduleHealth = totalTasks > 0 ? ((totalTasks - overdueTasks) / totalTasks) * 100 : 100
+
+        const pendingSubmittals = projectSubmittals.filter(s => 
+          s.status === 'submitted' || s.status === 'IFA' || s.status === 'BFA'
+        ).length
+
+        const activePackages = projectPackages.filter(wp => 
+          wp.status === 'fabrication' || wp.status === 'ready'
+        ).length
+
+        let healthScore = 100
+        if (overdueTasks > 0) healthScore -= overdueTasks * 5
+        if (overBudgetCodes > 0) healthScore -= overBudgetCodes * 10
+        if (agingRFIs > 0) healthScore -= agingRFIs * 8
+        if (marginPercent < 0) healthScore -= 20
+
+        const healthStatus: 'healthy' | 'warning' | 'critical' = 
+          healthScore >= 70 ? 'healthy' : healthScore >= 40 ? 'warning' : 'critical'
+
+        const riskLevel: 'low' | 'medium' | 'high' = 
+          healthScore >= 70 ? 'low' : healthScore >= 40 ? 'medium' : 'high'
+
+        return {
+          project_id: project.id,
+          project_number: project.number,
+          project_name: project.name,
+          client: project.client,
+          status: project.status,
+          contract_value: contractValue,
+          actual_cost: actualTotal,
+          margin,
+          margin_percent: marginPercent,
+          budget_total: budgetTotal,
+          approved_change_orders: projectChangeOrders.length,
+          change_order_total: changeOrderTotal,
+          open_rfis: openRFIs,
+          aging_rfis: agingRFIs,
+          over_budget_cost_codes: overBudgetCodes,
+          total_tasks: totalTasks,
+          completed_tasks: completedTasks,
+          overdue_tasks: overdueTasks,
+          schedule_health: scheduleHealth,
+          pending_submittals: pendingSubmittals,
+          active_packages: activePackages,
+          health_status: healthStatus,
+          health_score: Math.max(0, healthScore),
+          risk_level: riskLevel,
         }
-      } else {
-        setMetrics({
-          totalProjects: projects.length,
-          activeProjects: projects.filter(p => p.status === 'active').length,
-          totalValue: projects.reduce((sum, p) => sum + (p.contractValue || 0), 0),
-          atRiskProjects: 0,
-          onScheduleProjects: 0,
-          underBudgetProjects: 0,
-          totalBudget: 0,
-          totalSpent: 0,
-          utilizationRate: 0,
-          avgScheduleHealth: 0,
-          totalRisks: 0,
-          highRisks: 0,
-        })
-        setProjectHealthData([])
-      }
+      })
+
+      setProjectHealthData(healthData)
+
+      const activeProjects = healthData.filter(p => p.status === 'active')
+      const totalValue = healthData.reduce((sum, p) => sum + p.contract_value, 0)
+      const totalSpent = healthData.reduce((sum, p) => sum + p.actual_cost, 0)
+      const totalMargin = totalValue - totalSpent
+      const marginPercent = totalValue > 0 ? (totalMargin / totalValue) * 100 : 0
+
+      setMetrics({
+        totalProjects: allProjects.length,
+        activeProjects: activeProjects.length,
+        planningProjects: allProjects.filter(p => p.status === 'planning').length,
+        completedProjects: allProjects.filter(p => p.status === 'completed').length,
+        totalValue,
+        totalSpent,
+        totalMargin,
+        marginPercent,
+        atRiskProjects: healthData.filter(p => p.health_status === 'warning' || p.health_status === 'critical').length,
+        criticalProjects: healthData.filter(p => p.health_status === 'critical').length,
+        warningProjects: healthData.filter(p => p.health_status === 'warning').length,
+        healthyProjects: healthData.filter(p => p.health_status === 'healthy').length,
+        onScheduleProjects: healthData.filter(p => p.overdue_tasks === 0).length,
+        underBudgetProjects: healthData.filter(p => p.over_budget_cost_codes === 0).length,
+        avgScheduleHealth: healthData.length > 0 ? healthData.reduce((sum, p) => sum + p.schedule_health, 0) / healthData.length : 100,
+        totalOverdueTasks: healthData.reduce((sum, p) => sum + p.overdue_tasks, 0),
+        totalActiveTasks: healthData.reduce((sum, p) => sum + (p.total_tasks - p.completed_tasks), 0),
+        totalOpenRFIs: healthData.reduce((sum, p) => sum + p.open_rfis, 0),
+        totalAgingRFIs: healthData.reduce((sum, p) => sum + p.aging_rfis, 0),
+        totalPendingSubmittals: healthData.reduce((sum, p) => sum + p.pending_submittals, 0),
+        totalActivePackages: healthData.reduce((sum, p) => sum + p.active_packages, 0),
+        totalOverBudgetCodes: healthData.reduce((sum, p) => sum + p.over_budget_cost_codes, 0),
+        utilizationRate: allProjects.length > 0 ? (activeProjects.length / allProjects.length) * 100 : 0,
+        avgMarginPercent: healthData.length > 0 ? healthData.reduce((sum, p) => sum + p.margin_percent, 0) / healthData.length : 0,
+      })
 
       setLoading(false)
     }
 
     calculatePortfolioMetrics()
-  }, [projects, isDesktop, db])
+  }, [allProjects, allRFIs, allTasks, allCostCodes, allChangeOrders, allSubmittals, allWorkPackages])
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -157,18 +296,24 @@ export function PortfolioPulsePage() {
 
   const getStatusBadge = (status: ProjectHealth['health_status']) => {
     const config = {
-      healthy: { variant: 'default' as const, label: 'Healthy', icon: <CheckCircle size={14} /> },
-      warning: { variant: 'secondary' as const, label: 'Warning', icon: <Warning size={14} /> },
-      critical: { variant: 'destructive' as const, label: 'Critical', icon: <Warning size={14} /> },
+      healthy: { variant: 'default' as const, label: 'Healthy', icon: <CheckCircle size={14} weight="fill" /> },
+      warning: { variant: 'secondary' as const, label: 'Warning', icon: <Warning size={14} weight="fill" /> },
+      critical: { variant: 'destructive' as const, label: 'Critical', icon: <Warning size={14} weight="fill" /> },
     }
     return config[status]
   }
 
-  const projectsByStatus = projects ? [
-    { name: 'Active', value: projects.filter(p => p.status === 'active').length, color: 'hsl(var(--primary))' },
-    { name: 'Planning', value: projects.filter(p => p.status === 'planning').length, color: 'hsl(var(--accent))' },
-    { name: 'On Hold', value: projects.filter(p => p.status === 'onhold').length, color: 'hsl(var(--muted))' },
-    { name: 'Completed', value: projects.filter(p => p.status === 'completed').length, color: 'hsl(var(--secondary))' },
+  const projectsByStatus = allProjects ? [
+    { name: 'Active', value: allProjects.filter(p => p.status === 'active').length, color: '#10b981' },
+    { name: 'Planning', value: allProjects.filter(p => p.status === 'planning').length, color: '#6366f1' },
+    { name: 'On Hold', value: allProjects.filter(p => p.status === 'onhold').length, color: '#f59e0b' },
+    { name: 'Completed', value: allProjects.filter(p => p.status === 'completed').length, color: '#8b5cf6' },
+  ].filter(item => item.value > 0) : []
+
+  const projectsByHealth = projectHealthData ? [
+    { name: 'Healthy', value: projectHealthData.filter(p => p.health_status === 'healthy').length, color: '#10b981' },
+    { name: 'Warning', value: projectHealthData.filter(p => p.health_status === 'warning').length, color: '#f59e0b' },
+    { name: 'Critical', value: projectHealthData.filter(p => p.health_status === 'critical').length, color: '#ef4444' },
   ].filter(item => item.value > 0) : []
 
   const filteredHealthData = projectHealthData.filter(h => {
@@ -177,21 +322,12 @@ export function PortfolioPulsePage() {
     return true
   })
 
-  const budgetPerformance = filteredHealthData.map(h => ({
-    name: h.project_name.substring(0, 15),
-    health: Math.round(h.margin_percent),
-  }))
+  const sortedProjects = [...filteredHealthData].sort((a, b) => b.health_score - a.health_score)
 
-  const marginAtRiskData = filteredHealthData.slice(0, 10).map(h => ({
-    name: h.project_name.substring(0, 20),
-    margin: Math.round(h.margin),
-    marginPercent: parseFloat(h.margin_percent.toFixed(1)),
-    status: h.health_status
-  }))
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
+      <div className="flex items-center justify-center h-96 animate-in">
         <div className="text-center">
           <Buildings size={48} className="mx-auto mb-4 text-muted-foreground animate-pulse" />
           <p className="text-muted-foreground">Loading portfolio data...</p>
@@ -200,24 +336,25 @@ export function PortfolioPulsePage() {
     )
   }
 
-  if (!metrics || !projects || projects.length === 0) {
+  if (!metrics || !allProjects || allProjects.length === 0) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 p-6 animate-in">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">Portfolio Pulse</h2>
-            <p className="text-muted-foreground">Portfolio-wide metrics and insights</p>
+            <h2 className="font-display text-4xl font-bold tracking-tight">Portfolio Pulse</h2>
+            <p className="text-muted-foreground mt-2">Cross-project health analytics</p>
           </div>
         </div>
         <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-            <Buildings size={48} className="text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No projects</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Create your first project to see portfolio metrics
+          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+            <Buildings size={56} className="text-muted-foreground mb-4" weight="duotone" />
+            <h3 className="text-xl font-semibold mb-2">No projects yet</h3>
+            <p className="text-sm text-muted-foreground mb-6 max-w-md">
+              Create your first project to unlock portfolio-wide insights and cross-project analytics
             </p>
-            <Button onClick={() => navigate('/projects')}>
-              Go to Projects
+            <Button onClick={() => navigate('/projects')} className="gap-2">
+              <Plus size={18} weight="bold" />
+              Create Project
             </Button>
           </CardContent>
         </Card>
@@ -226,236 +363,274 @@ export function PortfolioPulsePage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 p-6 animate-in">
+      <div className="flex items-start justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Portfolio Pulse</h2>
-          <p className="text-muted-foreground">Portfolio-wide metrics and project health</p>
+          <h2 className="font-display text-4xl font-bold tracking-tight">Portfolio Pulse</h2>
+          <p className="text-muted-foreground mt-2">Cross-project health analytics and live metrics</p>
         </div>
-        <Button variant="outline" onClick={() => navigate('/projects')}>
-          View All Projects
-        </Button>
+        <div className="flex items-center gap-3">
+          {syncing && (
+            <Badge variant="secondary" className="gap-2 animate-pulse">
+              <ArrowsClockwise className="w-3.5 h-3.5 animate-spin" />
+              Syncing...
+            </Badge>
+          )}
+          <Button variant="outline" onClick={() => navigate('/projects')} className="gap-2">
+            View All Projects
+            <ArrowRight size={16} />
+          </Button>
+        </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Projects</CardTitle>
-            <Buildings size={20} className="text-muted-foreground" />
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:scale-[1.02] border-l-4 border-l-primary cursor-pointer" onClick={() => navigate('/projects')}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-sm font-semibold text-muted-foreground">Total Projects</CardTitle>
+            <Buildings size={20} className="text-primary" weight="duotone" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics.totalProjects}</div>
-            <p className="text-xs text-muted-foreground">
-              {metrics.activeProjects} active
+            <div className="font-mono text-3xl font-bold tracking-tight">{metrics.totalProjects}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {metrics.activeProjects} active • {metrics.planningProjects} planning
             </p>
+            <Progress value={metrics.utilizationRate} className="mt-3 h-2" />
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Portfolio Value</CardTitle>
-            <CurrencyDollar size={20} className="text-muted-foreground" />
+        <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:scale-[1.02] border-l-4 border-l-success cursor-pointer" onClick={() => navigate('/financials')}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-sm font-semibold text-muted-foreground">Portfolio Value</CardTitle>
+            <CurrencyDollar size={20} className="text-success" weight="duotone" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(metrics.totalValue)}</div>
-            <p className="text-xs text-muted-foreground">
-              Total contract value
+            <div className="font-mono text-3xl font-bold tracking-tight">{formatCurrency(metrics.totalValue)}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {formatCurrency(metrics.totalSpent)} spent
             </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Margin</CardTitle>
-            {metrics.totalSpent <= metrics.totalValue ? (
-              <TrendUp size={20} className="text-accent" />
-            ) : (
-              <TrendDown size={20} className="text-destructive" />
-            )}
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${metrics.totalSpent <= metrics.totalValue ? 'text-accent' : 'text-destructive'}`}>
-              {formatCurrency(metrics.totalValue - metrics.totalSpent)}
+            <div className={cn("mt-3 flex items-center gap-1.5 text-xs font-medium", 
+              metrics.marginPercent >= 0 ? "text-success" : "text-destructive"
+            )}>
+              {metrics.marginPercent >= 0 ? <TrendUp className="w-3.5 h-3.5" weight="bold" /> : <TrendDown className="w-3.5 h-3.5" weight="bold" />}
+              <span>{Math.abs(metrics.marginPercent).toFixed(1)}% margin</span>
             </div>
-            <p className="text-xs text-muted-foreground">
-              {metrics.totalValue > 0 ? (((metrics.totalValue - metrics.totalSpent) / metrics.totalValue) * 100).toFixed(1) : 0}% margin
-            </p>
           </CardContent>
         </Card>
 
-        <Card className={metrics.atRiskProjects > 0 ? 'border-destructive bg-destructive/5' : ''}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Critical Risk</CardTitle>
-            <Warning size={20} className={metrics.atRiskProjects > 0 ? 'text-destructive animate-pulse' : 'text-muted-foreground'} />
+        <Card className={cn(
+          "overflow-hidden hover:shadow-lg transition-all duration-300 hover:scale-[1.02] border-l-4",
+          metrics.criticalProjects > 0 ? "border-l-destructive" : "border-l-warning"
+        )}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-sm font-semibold text-muted-foreground">At Risk</CardTitle>
+            <Warning size={20} className={metrics.criticalProjects > 0 ? 'text-destructive' : 'text-warning'} weight="duotone" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${metrics.atRiskProjects > 0 ? 'text-destructive' : 'text-accent'}`}>
+            <div className={cn("font-mono text-3xl font-bold tracking-tight", 
+              metrics.criticalProjects > 0 ? 'text-destructive' : metrics.atRiskProjects > 0 ? 'text-warning' : 'text-success'
+            )}>
               {metrics.atRiskProjects}
             </div>
-            <p className="text-xs text-muted-foreground">
-              {metrics.highRisks} critical projects
+            <p className="text-xs text-muted-foreground mt-1">
+              {metrics.criticalProjects} critical • {metrics.warningProjects} warning
             </p>
+            {metrics.atRiskProjects === 0 && (
+              <div className="mt-3 flex items-center gap-1.5 text-xs font-medium text-success">
+                <CheckCircle className="w-3.5 h-3.5" weight="fill" />
+                <span>All healthy</span>
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Risks</CardTitle>
-            <ChartLine size={20} className="text-muted-foreground" />
+        <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:scale-[1.02] border-l-4 border-l-accent cursor-pointer" onClick={() => navigate('/schedule')}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-sm font-semibold text-muted-foreground">Schedule Health</CardTitle>
+            <Clock size={20} className="text-accent" weight="duotone" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics.totalRisks}</div>
-            <p className="text-xs text-muted-foreground">
-              Total risk flags
+            <div className={cn("font-mono text-3xl font-bold tracking-tight",
+              metrics.avgScheduleHealth >= 80 ? "text-success" : 
+              metrics.avgScheduleHealth >= 60 ? "text-warning" : "text-destructive"
+            )}>
+              {Math.round(metrics.avgScheduleHealth)}%
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {metrics.totalOverdueTasks} overdue of {metrics.totalActiveTasks} active
             </p>
+            <Progress value={metrics.avgScheduleHealth} className="mt-3 h-2" />
+          </CardContent>
+        </Card>
+
+        <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:scale-[1.02] border-l-4 border-l-warning cursor-pointer" onClick={() => navigate('/rfis')}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-sm font-semibold text-muted-foreground">Open RFIs</CardTitle>
+            <FileText size={20} className="text-warning" weight="duotone" />
+          </CardHeader>
+          <CardContent>
+            <div className="font-mono text-3xl font-bold tracking-tight text-warning">{metrics.totalOpenRFIs}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {metrics.totalAgingRFIs} aging ({'>'} 72hrs)
+            </p>
+            {metrics.totalOpenRFIs === 0 && (
+              <div className="mt-3 flex items-center gap-1.5 text-xs font-medium text-success">
+                <CheckCircle className="w-3.5 h-3.5" weight="fill" />
+                <span>All clear</span>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      <Tabs defaultValue="health" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="health">Project Health</TabsTrigger>
-          <TabsTrigger value="performance">Performance</TabsTrigger>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-        </TabsList>
+      <Tabs defaultValue="health" className="space-y-6">
+        <div className="flex items-center justify-between">
+          <TabsList>
+            <TabsTrigger value="health">Project Health</TabsTrigger>
+            <TabsTrigger value="analytics">Analytics</TabsTrigger>
+            <TabsTrigger value="details">Detailed View</TabsTrigger>
+          </TabsList>
+          <div className="flex items-center gap-2">
+            <Select value={healthFilter} onValueChange={setHealthFilter}>
+              <SelectTrigger className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Health</SelectItem>
+                <SelectItem value="healthy">Healthy</SelectItem>
+                <SelectItem value="warning">Warning</SelectItem>
+                <SelectItem value="critical">Critical</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="planning">Planning</SelectItem>
+                <SelectItem value="onhold">On Hold</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
 
-        <TabsContent value="health" className="space-y-4">
+        <TabsContent value="health" className="space-y-6">
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>Margin at Risk Analysis</CardTitle>
-                  <CardDescription>Critical projects sorted by financial risk and margin erosion</CardDescription>
+                  <CardTitle>Project Health Overview</CardTitle>
+                  <CardDescription>Cross-project health metrics and risk indicators</CardDescription>
                 </div>
-                <div className="flex gap-2">
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-32">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="planning">Planning</SelectItem>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="onhold">On Hold</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select value={healthFilter} onValueChange={setHealthFilter}>
-                    <SelectTrigger className="w-32">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Health</SelectItem>
-                      <SelectItem value="healthy">Healthy</SelectItem>
-                      <SelectItem value="warning">Warning</SelectItem>
-                      <SelectItem value="critical">Critical</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                <Badge variant="secondary" className="ml-auto">{filteredHealthData.length} Projects</Badge>
               </div>
             </CardHeader>
             <CardContent>
               {filteredHealthData.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <Buildings size={48} className="text-muted-foreground mb-4" />
+                  <Buildings size={48} className="text-muted-foreground mb-4" weight="duotone" />
                   <h3 className="text-lg font-semibold mb-2">No projects match filters</h3>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Try adjusting your filters or create a new project
+                    Try adjusting your filters to see more projects
                   </p>
                   <Button variant="outline" onClick={() => { setStatusFilter('all'); setHealthFilter('all') }}>
                     Clear Filters
                   </Button>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between text-sm text-muted-foreground">
-                    <span>Showing {filteredHealthData.length} of {projectHealthData.length} projects (sorted by risk priority)</span>
-                  </div>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Project</TableHead>
-                        <TableHead>Health Status</TableHead>
-                        <TableHead className="text-right">Contract Value</TableHead>
-                        <TableHead className="text-right">Actual Cost</TableHead>
-                        <TableHead className="text-right">Margin $</TableHead>
-                        <TableHead className="text-right">Margin %</TableHead>
-                        <TableHead className="text-center">Risk Flags</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredHealthData.map((health) => {
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Project</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Contract Value</TableHead>
+                      <TableHead className="text-right">Margin %</TableHead>
+                      <TableHead className="text-center">Schedule</TableHead>
+                      <TableHead className="text-center">Open RFIs</TableHead>
+                      <TableHead className="text-center">Overdue</TableHead>
+                      <TableHead className="text-center">Health</TableHead>
+                      <TableHead></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sortedProjects.map((health) => {
                       const statusBadge = getStatusBadge(health.health_status)
-                      const marginColor = health.margin_percent >= 15 ? 'text-accent' : 
-                                        health.margin_percent >= 10 ? 'text-warning' : 
-                                        health.margin_percent >= 5 ? 'text-destructive/80' : 
+                      const marginColor = health.margin_percent >= 15 ? 'text-success' : 
+                                        health.margin_percent >= 10 ? 'text-accent' : 
+                                        health.margin_percent >= 5 ? 'text-warning' : 
                                         'text-destructive'
                       return (
-                        <TableRow key={health.project_id} className={health.health_status === 'critical' ? 'bg-destructive/5' : ''}>
+                        <TableRow 
+                          key={health.project_id} 
+                          className={cn(
+                            "cursor-pointer transition-colors hover:bg-muted/50",
+                            health.health_status === 'critical' && 'bg-destructive/5 hover:bg-destructive/10'
+                          )}
+                          onClick={() => navigate(`/projects/${health.project_id}`)}
+                        >
                           <TableCell>
                             <div>
-                              <div className="font-medium flex items-center gap-2">
+                              <div className="font-semibold text-base flex items-center gap-2">
                                 {health.project_name}
-                                {health.health_status === 'critical' && (
-                                  <Badge variant="destructive" className="text-xs">
-                                    <Warning size={12} className="mr-1" />
-                                    Critical
-                                  </Badge>
-                                )}
                               </div>
-                              <div className="text-xs text-muted-foreground">{health.project_number}</div>
+                              <div className="text-xs text-muted-foreground font-mono">{health.project_number} • {health.client}</div>
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge variant={statusBadge.variant}>
-                              <span className="mr-1">{statusBadge.icon}</span>
+                            <Badge variant="secondary" className="capitalize text-xs">
+                              {health.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm font-semibold">
+                            {formatCurrency(health.contract_value)}
+                          </TableCell>
+                          <TableCell className={cn("text-right font-mono text-sm font-bold", marginColor)}>
+                            {health.margin_percent >= 0 ? '+' : ''}{health.margin_percent.toFixed(1)}%
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <div className="flex items-center justify-center gap-2">
+                              <Progress value={health.schedule_health} className="w-16 h-2" />
+                              <span className="text-xs font-mono">{Math.round(health.schedule_health)}%</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {health.open_rfis > 0 ? (
+                              <Badge variant={health.aging_rfis > 0 ? "destructive" : "secondary"} className="text-xs">
+                                {health.open_rfis}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">0</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {health.overdue_tasks > 0 ? (
+                              <Badge variant="destructive" className="text-xs">
+                                {health.overdue_tasks}
+                              </Badge>
+                            ) : (
+                              <CheckCircle size={18} className="text-success inline" weight="fill" />
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant={statusBadge.variant} className="gap-1.5">
+                              {statusBadge.icon}
                               {statusBadge.label}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-right font-mono text-sm">
-                            {formatCurrency(health.contract_value)}
-                          </TableCell>
-                          <TableCell className="text-right font-mono text-sm">
-                            {formatCurrency(health.actual_cost)}
-                          </TableCell>
-                          <TableCell className={`text-right font-mono text-sm font-semibold ${marginColor}`}>
-                            {formatCurrency(health.margin)}
-                          </TableCell>
-                          <TableCell className={`text-right font-mono text-sm font-bold ${marginColor}`}>
-                            {health.margin_percent.toFixed(1)}%
-                          </TableCell>
                           <TableCell>
-                            <div className="flex items-center justify-center gap-1">
-                              {health.aging_rfis > 0 && (
-                                <Badge variant="destructive" className="text-xs" title={`${health.aging_rfis} aging RFI(s)`}>
-                                  <Clock size={12} className="mr-1" />
-                                  {health.aging_rfis}
-                                </Badge>
-                              )}
-                              {health.over_budget_cost_codes > 0 && (
-                                <Badge variant="destructive" className="text-xs" title={`${health.over_budget_cost_codes} over-budget cost code(s)`}>
-                                  <CurrencyDollar size={12} className="mr-1" />
-                                  {health.over_budget_cost_codes}
-                                </Badge>
-                              )}
-                              {health.slipping_tasks > 0 && (
-                                <Badge variant="secondary" className="text-xs" title={`${health.slipping_tasks} slipping task(s)`}>
-                                  <TrendDown size={12} className="mr-1" />
-                                  {health.slipping_tasks}
-                                </Badge>
-                              )}
-                              {health.total_risk_flags === 0 && (
-                                <span className="text-muted-foreground text-xs">None</span>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              size="sm"
-                              variant={health.health_status === 'critical' ? 'default' : 'outline'}
-                              onClick={() => navigate(`/projects/${health.project_id}`)}
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="gap-2"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                navigate(`/projects/${health.project_id}`)
+                              }}
                             >
-                              {health.health_status === 'critical' ? 'Review Now' : 'View'}
+                              View
+                              <ArrowRight size={14} />
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -463,179 +638,62 @@ export function PortfolioPulsePage() {
                     })}
                   </TableBody>
                 </Table>
-                </div>
               )}
             </CardContent>
           </Card>
-
-          {filteredHealthData.filter(h => h.health_status === 'critical').length > 0 && (
-            <Card className="border-destructive bg-destructive/5">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-destructive">
-                  <Warning size={24} />
-                  Critical Projects Requiring Immediate Attention
-                </CardTitle>
-                <CardDescription>
-                  These projects have margin below 5% or multiple active risk flags
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {filteredHealthData
-                  .filter(h => h.health_status === 'critical')
-                  .map((health) => (
-                    <div key={health.project_id} className="bg-background p-4 rounded-lg border border-destructive">
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <h4 className="font-semibold text-lg">{health.project_name}</h4>
-                          <p className="text-sm text-muted-foreground">{health.project_number}</p>
-                        </div>
-                        <Button 
-                          size="sm"
-                          onClick={() => navigate(`/projects/${health.project_id}/pma`)}
-                          className="bg-destructive hover:bg-destructive/90"
-                        >
-                          View Insights
-                        </Button>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
-                        <div>
-                          <div className="text-xs text-muted-foreground mb-1">Margin at Risk</div>
-                          <div className={`text-lg font-bold ${health.margin_percent < 5 ? 'text-destructive' : 'text-warning'}`}>
-                            {health.margin_percent.toFixed(1)}%
-                          </div>
-                          <div className="text-xs text-muted-foreground">{formatCurrency(health.margin)}</div>
-                        </div>
-                        <div>
-                          <div className="text-xs text-muted-foreground mb-1">Aging RFIs</div>
-                          <div className="text-lg font-bold text-destructive">{health.aging_rfis}</div>
-                          <div className="text-xs text-muted-foreground">of {health.open_rfis} open</div>
-                        </div>
-                        <div>
-                          <div className="text-xs text-muted-foreground mb-1">Over Budget</div>
-                          <div className="text-lg font-bold text-destructive">{health.over_budget_cost_codes}</div>
-                          <div className="text-xs text-muted-foreground">cost codes</div>
-                        </div>
-                        <div>
-                          <div className="text-xs text-muted-foreground mb-1">Schedule Slip</div>
-                          <div className="text-lg font-bold text-warning">{health.slipping_tasks}</div>
-                          <div className="text-xs text-muted-foreground">tasks behind</div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 pt-2 border-t">
-                        <Badge variant="outline" className="text-xs">
-                          <CurrencyDollar size={12} className="mr-1" />
-                          {formatCurrency(health.contract_value)} Contract
-                        </Badge>
-                        <Badge variant="outline" className="text-xs">
-                          <TrendDown size={12} className="mr-1" />
-                          {formatCurrency(health.actual_cost)} Spent
-                        </Badge>
-                        {health.change_order_total > 0 && (
-                          <Badge variant="secondary" className="text-xs">
-                            +{formatCurrency(health.change_order_total)} in COs
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-              </CardContent>
-            </Card>
-          )}
         </TabsContent>
 
-        <TabsContent value="performance" className="space-y-4">
+        <TabsContent value="analytics" className="space-y-6">
           <div className="grid gap-6 md:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle>Margin at Risk by Project</CardTitle>
-                <CardDescription>Top 10 projects ranked by margin percentage</CardDescription>
+                <CardTitle>Project Distribution</CardTitle>
+                <CardDescription>Projects by status</CardDescription>
               </CardHeader>
               <CardContent>
-                {marginAtRiskData.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-center">
-                    <ChartLine size={48} className="text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">No data</h3>
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={marginAtRiskData}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                      <XAxis
-                        dataKey="name"
-                        tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
-                        angle={-45}
-                        textAnchor="end"
-                        height={80}
-                      />
-                      <YAxis
-                        tick={{ fill: 'hsl(var(--muted-foreground))' }}
-                        label={{ value: 'Margin %', angle: -90, position: 'insideLeft' }}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: 'hsl(var(--card))',
-                          border: '1px solid hsl(var(--border))',
-                          borderRadius: '0.5rem',
-                        }}
-                        formatter={(value: number) => [`${value.toFixed(1)}%`, 'Margin']}
-                      />
-                      <Bar 
-                        dataKey="marginPercent" 
-                        fill="hsl(var(--primary))"
-                        label={{ 
-                          position: 'top', 
-                          formatter: (value: number) => `${value}%`,
-                          fontSize: 10
-                        }}
-                      >
-                        {marginAtRiskData.map((entry, index) => (
-                          <Cell 
-                            key={`cell-${index}`} 
-                            fill={
-                              entry.status === 'critical' ? 'hsl(var(--destructive))' :
-                              entry.status === 'warning' ? 'hsl(var(--warning))' :
-                              'hsl(var(--accent))'
-                            }
-                          />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Projects by Status</CardTitle>
-                <CardDescription>Portfolio distribution</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={280}>
                   <PieChart>
                     <Pie
                       data={projectsByStatus}
                       cx="50%"
                       cy="50%"
                       labelLine={false}
-                      label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                      label={({ name, value }) => value > 0 ? `${name}: ${value}` : ''}
                       outerRadius={100}
-                      fill="#8884d8"
                       dataKey="value"
                     >
                       {projectsByStatus.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: 'hsl(var(--card))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '0.5rem',
-                      }}
-                    />
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Health Distribution</CardTitle>
+                <CardDescription>Projects by health status</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={280}>
+                  <PieChart>
+                    <Pie
+                      data={projectsByHealth}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, value }) => value > 0 ? `${name}: ${value}` : ''}
+                      outerRadius={100}
+                      dataKey="value"
+                    >
+                      {projectsByHealth.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
                   </PieChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -644,40 +702,164 @@ export function PortfolioPulsePage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Risk Distribution Summary</CardTitle>
-              <CardDescription>Overview of financial and operational risk across portfolio</CardDescription>
+              <CardTitle>Portfolio Performance Matrix</CardTitle>
+              <CardDescription>Budget utilization vs schedule performance</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                <div className="space-y-2">
-                  <div className="text-sm text-muted-foreground">Critical Projects</div>
-                  <div className="text-3xl font-bold text-destructive">
-                    {projectHealthData.filter(p => p.health_status === 'critical').length}
+              <ResponsiveContainer width="100%" height={400}>
+                <ScatterChart>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis 
+                    dataKey="schedule_health" 
+                    name="Schedule Health" 
+                    unit="%" 
+                    tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                    label={{ value: 'Schedule Health %', position: 'bottom' }}
+                  />
+                  <YAxis 
+                    dataKey="margin_percent" 
+                    name="Margin" 
+                    unit="%" 
+                    tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                    label={{ value: 'Margin %', angle: -90, position: 'insideLeft' }}
+                  />
+                  <ZAxis dataKey="contract_value" range={[100, 1000]} name="Contract Value" />
+                  <Tooltip 
+                    cursor={{ strokeDasharray: '3 3' }}
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload
+                        return (
+                          <div className="bg-card p-3 border rounded-lg shadow-lg">
+                            <p className="font-semibold">{data.project_name}</p>
+                            <p className="text-sm text-muted-foreground">{data.project_number}</p>
+                            <div className="mt-2 space-y-1">
+                              <p className="text-sm">Schedule: {Math.round(data.schedule_health)}%</p>
+                              <p className="text-sm">Margin: {data.margin_percent.toFixed(1)}%</p>
+                              <p className="text-sm">Value: {formatCurrency(data.contract_value)}</p>
+                            </div>
+                          </div>
+                        )
+                      }
+                      return null
+                    }}
+                  />
+                  <Scatter 
+                    data={projectHealthData} 
+                    fill="#6366f1"
+                  />
+                </ScatterChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="details" className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card className="cursor-pointer hover:shadow-lg transition-all" onClick={() => setHealthFilter('critical')}>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Critical Projects</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="font-mono text-3xl font-bold text-destructive">{metrics.criticalProjects}</div>
+                <p className="text-xs text-muted-foreground mt-1">Immediate action required</p>
+              </CardContent>
+            </Card>
+
+            <Card className="cursor-pointer hover:shadow-lg transition-all" onClick={() => setHealthFilter('warning')}>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Warning Projects</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="font-mono text-3xl font-bold text-warning">{metrics.warningProjects}</div>
+                <p className="text-xs text-muted-foreground mt-1">Monitor closely</p>
+              </CardContent>
+            </Card>
+
+            <Card className="cursor-pointer hover:shadow-lg transition-all" onClick={() => setHealthFilter('healthy')}>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Healthy Projects</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="font-mono text-3xl font-bold text-success">{metrics.healthyProjects}</div>
+                <p className="text-xs text-muted-foreground mt-1">On track</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Key Metrics Summary</CardTitle>
+                <CardDescription>Portfolio-wide operational indicators</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                  <div className="flex items-center gap-3">
+                    <Package size={20} className="text-accent" />
+                    <span className="text-sm font-medium">Active Work Packages</span>
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    Margin below 5%
+                  <span className="font-mono font-bold text-lg">{metrics.totalActivePackages}</span>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                  <div className="flex items-center gap-3">
+                    <FileText size={20} className="text-warning" />
+                    <span className="text-sm font-medium">Pending Submittals</span>
+                  </div>
+                  <span className="font-mono font-bold text-lg">{metrics.totalPendingSubmittals}</span>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                  <div className="flex items-center gap-3">
+                    <CurrencyDollar size={20} className="text-destructive" />
+                    <span className="text-sm font-medium">Over-Budget Cost Codes</span>
+                  </div>
+                  <span className="font-mono font-bold text-lg text-destructive">{metrics.totalOverBudgetCodes}</span>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                  <div className="flex items-center gap-3">
+                    <ListChecks size={20} className="text-success" />
+                    <span className="text-sm font-medium">Active Tasks</span>
+                  </div>
+                  <span className="font-mono font-bold text-lg">{metrics.totalActiveTasks}</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Financial Overview</CardTitle>
+                <CardDescription>Aggregated financial metrics</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="p-4 rounded-lg bg-muted/30">
+                  <div className="text-sm text-muted-foreground mb-1">Total Portfolio Value</div>
+                  <div className="font-mono text-2xl font-bold">{formatCurrency(metrics.totalValue)}</div>
+                </div>
+                <div className="p-4 rounded-lg bg-muted/30">
+                  <div className="text-sm text-muted-foreground mb-1">Total Spent</div>
+                  <div className="font-mono text-2xl font-bold">{formatCurrency(metrics.totalSpent)}</div>
+                  <Progress value={(metrics.totalSpent / metrics.totalValue) * 100} className="mt-2 h-2" />
+                </div>
+                <div className={cn("p-4 rounded-lg", metrics.totalMargin >= 0 ? "bg-success/10" : "bg-destructive/10")}>
+                  <div className="text-sm text-muted-foreground mb-1">Total Margin</div>
+                  <div className={cn("font-mono text-2xl font-bold", 
+                    metrics.totalMargin >= 0 ? "text-success" : "text-destructive"
+                  )}>
+                    {formatCurrency(metrics.totalMargin)}
+                  </div>
+                  <div className="text-sm font-medium mt-1">
+                    {metrics.marginPercent.toFixed(1)}% margin
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <div className="text-sm text-muted-foreground">Warning Projects</div>
-                  <div className="text-3xl font-bold text-warning">
-                    {projectHealthData.filter(p => p.health_status === 'warning').length}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    Margin 5-10%
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="text-sm text-muted-foreground">Healthy Projects</div>
-                  <div className="text-3xl font-bold text-accent">
-                    {projectHealthData.filter(p => p.health_status === 'healthy').length}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    Margin above 10%
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="text-sm text-muted-foreground">Total Risk Flags</div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
+}
+
                   <div className="text-3xl font-bold">
                     {projectHealthData.reduce((sum, p) => sum + p.total_risk_flags, 0)}
                   </div>
