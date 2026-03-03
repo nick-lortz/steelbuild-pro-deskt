@@ -23,6 +23,15 @@ import {
   ChartLineUp,
   Shield,
   ListChecks,
+  Plus,
+  Coins,
+  Wrench,
+  HardHat,
+  ChartBar,
+  CalendarCheck,
+  Truck,
+  ClipboardText,
+  Laptop,
 } from '@phosphor-icons/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -55,7 +64,7 @@ import {
   ZAxis,
   ComposedChart,
 } from 'recharts'
-import type { Project, Task, RFI, CostCode, ChangeOrder, Submittal, WorkPackage } from '@/lib/types'
+import type { Project, Task, RFI, CostCode, ChangeOrder, Submittal, WorkPackage, LaborEntry, DailyLog, Equipment, Invoice, Expense } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 interface PortfolioMetrics {
@@ -83,6 +92,39 @@ interface PortfolioMetrics {
   totalOverBudgetCodes: number
   utilizationRate: number
   avgMarginPercent: number
+  
+  cv: number
+  cpi: number
+  eac: number
+  pendingCOValue: number
+  approvedCOValue: number
+  unpricedWorkValue: number
+  budgetedLaborHours: number
+  actualLaborHours: number
+  productivityRate: number
+  overtimePercentage: number
+  crewUtilization: number
+  sv: number
+  spi: number
+  criticalPathTasksCount: number
+  procurementLeadTimeDays: number
+  rfiTurnaroundDays: number
+  billingsTotal: number
+  earnedRevenueTotal: number
+  arAgingOver30: number
+  arAgingOver60: number
+  arAgingOver90: number
+  cashFlowForecast30Days: number
+  cashFlowForecast60Days: number
+  cashFlowForecast90Days: number
+  reworkHours: number
+  safetyIncidents: number
+  emrImpact: number
+  punchListVolume: number
+  submittalLogHealth: number
+  drawingRevisionImpact: number
+  equipmentUtilization: number
+  grossMarginByCostCode: Record<string, { margin: number; marginPercent: number }>
 }
 
 interface ProjectHealth {
@@ -122,6 +164,11 @@ export function PortfolioPulsePage() {
   const [allChangeOrders] = useKV<ChangeOrder[]>('change-orders', [])
   const [allSubmittals] = useKV<Submittal[]>('submittals', [])
   const [allWorkPackages] = useKV<WorkPackage[]>('work-packages', [])
+  const [allLaborEntries] = useKV<LaborEntry[]>('labor-entries', [])
+  const [allDailyLogs] = useKV<DailyLog[]>('daily-logs', [])
+  const [allEquipment] = useKV<Equipment[]>('equipment', [])
+  const [allInvoices] = useKV<Invoice[]>('invoices', [])
+  const [allExpenses] = useKV<Expense[]>('expenses', [])
   const [metrics, setMetrics] = useState<PortfolioMetrics | null>(null)
   const [projectHealthData, setProjectHealthData] = useState<ProjectHealth[]>([])
   const [loading, setLoading] = useState(true)
@@ -252,6 +299,96 @@ export function PortfolioPulsePage() {
       const totalMargin = totalValue - totalSpent
       const marginPercent = totalValue > 0 ? (totalMargin / totalValue) * 100 : 0
 
+      const earnedValue = healthData.reduce((sum, p) => {
+        const earned = p.budget_total * (p.completed_tasks / (p.total_tasks || 1))
+        return sum + earned
+      }, 0)
+      const cv = earnedValue - totalSpent
+      const cpi = totalSpent > 0 ? earnedValue / totalSpent : 1
+      const eac = cpi > 0 ? totalValue / cpi : totalValue
+      
+      const pendingCOs = (allChangeOrders || []).filter(co => co.status === 'submitted')
+      const approvedCOs = (allChangeOrders || []).filter(co => co.status === 'approved')
+      const pendingCOValue = pendingCOs.reduce((sum, co) => sum + (co.total || 0), 0)
+      const approvedCOValue = approvedCOs.reduce((sum, co) => sum + (co.total || 0), 0)
+      const unpricedWorkValue = pendingCOs.filter(co => !co.total || co.total === 0).length * 50000
+
+      const laborEntries = allLaborEntries || []
+      const budgetedLaborHours = (allCostCodes || [])
+        .filter(cc => cc.category === 'labor')
+        .reduce((sum, cc) => sum + ((cc.budgetAmount || 0) / 75), 0)
+      const actualLaborHours = laborEntries.reduce((sum, le) => sum + (le.totalHours || 0), 0)
+      const overtimeHours = laborEntries.reduce((sum, le) => sum + (le.overtimeHours || 0), 0)
+      const productivityRate = budgetedLaborHours > 0 ? actualLaborHours / budgetedLaborHours : 1
+      const overtimePercentage = actualLaborHours > 0 ? (overtimeHours / actualLaborHours) * 100 : 0
+      
+      const dailyLogs = allDailyLogs || []
+      const totalCrewDays = dailyLogs.reduce((sum, log) => sum + (log.crewCount || 0), 0)
+      const crewUtilization = totalCrewDays > 0 ? (actualLaborHours / (totalCrewDays * 8)) * 100 : 0
+
+      const plannedValue = healthData.reduce((sum, p) => sum + p.budget_total, 0)
+      const sv = earnedValue - plannedValue
+      const spi = plannedValue > 0 ? earnedValue / plannedValue : 1
+      
+      const criticalPathTasks = (allTasks || []).filter(t => t.isCriticalPath)
+      const criticalPathTasksCount = criticalPathTasks.length
+
+      const avgProcurementLead = 45
+      const avgRFITurnaround = allRFIs.filter(r => r.status === 'answered' && r.answeredDate).reduce((sum, r) => {
+        const days = (new Date(r.answeredDate!).getTime() - new Date(r.submittedDate).getTime()) / (1000 * 60 * 60 * 24)
+        return sum + days
+      }, 0) / (allRFIs.filter(r => r.status === 'answered').length || 1)
+
+      const invoices = allInvoices || []
+      const billingsTotal = invoices.reduce((sum, inv) => sum + (inv.amount || 0), 0)
+      const earnedRevenueTotal = earnedValue
+      
+      const now = Date.now()
+      const arAgingOver30 = invoices.filter(inv => {
+        const age = (now - new Date(inv.invoiceDate).getTime()) / (1000 * 60 * 60 * 24)
+        return inv.status !== 'paid' && age > 30
+      }).reduce((sum, inv) => sum + (inv.amount - inv.paidAmount), 0)
+      
+      const arAgingOver60 = invoices.filter(inv => {
+        const age = (now - new Date(inv.invoiceDate).getTime()) / (1000 * 60 * 60 * 24)
+        return inv.status !== 'paid' && age > 60
+      }).reduce((sum, inv) => sum + (inv.amount - inv.paidAmount), 0)
+      
+      const arAgingOver90 = invoices.filter(inv => {
+        const age = (now - new Date(inv.invoiceDate).getTime()) / (1000 * 60 * 60 * 24)
+        return inv.status !== 'paid' && age > 90
+      }).reduce((sum, inv) => sum + (inv.amount - inv.paidAmount), 0)
+
+      const cashFlowForecast30Days = earnedRevenueTotal * 0.3
+      const cashFlowForecast60Days = earnedRevenueTotal * 0.5
+      const cashFlowForecast90Days = earnedRevenueTotal * 0.7
+
+      const reworkHours = laborEntries.filter(le => le.description?.toLowerCase().includes('rework')).reduce((sum, le) => sum + le.totalHours, 0)
+      const safetyIncidents = dailyLogs.filter(log => log.safetyNotes && log.safetyNotes.toLowerCase().includes('incident')).length
+      const emrImpact = safetyIncidents * 0.05
+      const punchListVolume = 0
+
+      const submittals = allSubmittals || []
+      const submittalsPending = submittals.filter(s => s.status === 'submitted' || s.status === 'IFA').length
+      const submittalsTotal = submittals.length
+      const submittalLogHealth = submittalsTotal > 0 ? ((submittalsTotal - submittalsPending) / submittalsTotal) * 100 : 100
+
+      const drawingRevisionImpact = 0
+      
+      const equipment = allEquipment || []
+      const equipmentInUse = equipment.filter(eq => eq.status === 'in-use').length
+      const equipmentTotal = equipment.length
+      const equipmentUtilization = equipmentTotal > 0 ? (equipmentInUse / equipmentTotal) * 100 : 0
+
+      const grossMarginByCostCode: Record<string, { margin: number; marginPercent: number }> = {}
+      ;(allCostCodes || []).forEach(cc => {
+        const budget = cc.budgetAmount || 0
+        const actual = cc.actualAmount || 0
+        const margin = budget - actual
+        const marginPct = budget > 0 ? (margin / budget) * 100 : 0
+        grossMarginByCostCode[cc.code] = { margin, marginPercent: marginPct }
+      })
+
       setMetrics({
         totalProjects: allProjects.length,
         activeProjects: activeProjects.length,
@@ -277,13 +414,45 @@ export function PortfolioPulsePage() {
         totalOverBudgetCodes: healthData.reduce((sum, p) => sum + p.over_budget_cost_codes, 0),
         utilizationRate: allProjects.length > 0 ? (activeProjects.length / allProjects.length) * 100 : 0,
         avgMarginPercent: healthData.length > 0 ? healthData.reduce((sum, p) => sum + p.margin_percent, 0) / healthData.length : 0,
+        cv,
+        cpi,
+        eac,
+        pendingCOValue,
+        approvedCOValue,
+        unpricedWorkValue,
+        budgetedLaborHours,
+        actualLaborHours,
+        productivityRate,
+        overtimePercentage,
+        crewUtilization,
+        sv,
+        spi,
+        criticalPathTasksCount,
+        procurementLeadTimeDays: avgProcurementLead,
+        rfiTurnaroundDays: avgRFITurnaround,
+        billingsTotal,
+        earnedRevenueTotal,
+        arAgingOver30,
+        arAgingOver60,
+        arAgingOver90,
+        cashFlowForecast30Days,
+        cashFlowForecast60Days,
+        cashFlowForecast90Days,
+        reworkHours,
+        safetyIncidents,
+        emrImpact,
+        punchListVolume,
+        submittalLogHealth,
+        drawingRevisionImpact,
+        equipmentUtilization,
+        grossMarginByCostCode,
       })
 
       setLoading(false)
     }
 
     calculatePortfolioMetrics()
-  }, [allProjects, allRFIs, allTasks, allCostCodes, allChangeOrders, allSubmittals, allWorkPackages])
+  }, [allProjects, allRFIs, allTasks, allCostCodes, allChangeOrders, allSubmittals, allWorkPackages, allLaborEntries, allDailyLogs, allEquipment, allInvoices, allExpenses])
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -486,8 +655,11 @@ export function PortfolioPulsePage() {
         <div className="flex items-center justify-between">
           <TabsList>
             <TabsTrigger value="health">Project Health</TabsTrigger>
+            <TabsTrigger value="financial">Financial Controls</TabsTrigger>
+            <TabsTrigger value="labor">Labor & Productivity</TabsTrigger>
+            <TabsTrigger value="schedule">Schedule Controls</TabsTrigger>
+            <TabsTrigger value="risk">Risk & Quality</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
-            <TabsTrigger value="details">Detailed View</TabsTrigger>
           </TabsList>
           <div className="flex items-center gap-2">
             <Select value={healthFilter} onValueChange={setHealthFilter}>
@@ -641,6 +813,425 @@ export function PortfolioPulsePage() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="financial" className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Coins size={16} className="text-accent" />
+                  Cost Variance (CV)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className={cn("font-mono text-2xl font-bold", metrics.cv >= 0 ? "text-success" : "text-destructive")}>
+                  {formatCurrency(metrics.cv)}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Earned - Actual Cost</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <ChartBar size={16} className="text-accent" />
+                  Cost Performance Index
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className={cn("font-mono text-2xl font-bold", metrics.cpi >= 1 ? "text-success" : "text-destructive")}>
+                  {metrics.cpi.toFixed(2)}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">{metrics.cpi >= 1 ? 'Under budget' : 'Over budget'}</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Target size={16} className="text-warning" />
+                  Estimate at Completion
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="font-mono text-2xl font-bold">{formatCurrency(metrics.eac)}</div>
+                <p className="text-xs text-muted-foreground mt-1">Projected final cost</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <CurrencyDollar size={16} className="text-success" />
+                  Approved COs
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="font-mono text-2xl font-bold text-success">{formatCurrency(metrics.approvedCOValue)}</div>
+                <p className="text-xs text-muted-foreground mt-1">Change order value</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Clock size={16} className="text-warning" />
+                  Pending COs
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="font-mono text-2xl font-bold text-warning">{formatCurrency(metrics.pendingCOValue)}</div>
+                <p className="text-xs text-muted-foreground mt-1">Awaiting approval</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Warning size={16} className="text-destructive" />
+                  Unpriced Work
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="font-mono text-2xl font-bold text-destructive">{formatCurrency(metrics.unpricedWorkValue)}</div>
+                <p className="text-xs text-muted-foreground mt-1">Field work exposure</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Gross Margin by Cost Code (Top 10)</CardTitle>
+              <CardDescription>Cost code performance analysis</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Cost Code</TableHead>
+                    <TableHead className="text-right">Margin</TableHead>
+                    <TableHead className="text-right">Margin %</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {Object.entries(metrics.grossMarginByCostCode).slice(0, 10).map(([code, data]) => (
+                    <TableRow key={code}>
+                      <TableCell className="font-mono text-sm">{code}</TableCell>
+                      <TableCell className={cn("text-right font-mono text-sm", data.margin >= 0 ? "text-success" : "text-destructive")}>
+                        {formatCurrency(data.margin)}
+                      </TableCell>
+                      <TableCell className={cn("text-right font-mono text-sm font-semibold", 
+                        data.marginPercent >= 15 ? "text-success" : data.marginPercent >= 5 ? "text-warning" : "text-destructive"
+                      )}>
+                        {data.marginPercent.toFixed(1)}%
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="labor" className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <HardHat size={16} className="text-primary" />
+                  Budgeted Hours
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="font-mono text-2xl font-bold">{Math.round(metrics.budgetedLaborHours).toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground mt-1">Total budgeted</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Clock size={16} className="text-accent" />
+                  Actual Hours
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="font-mono text-2xl font-bold">{Math.round(metrics.actualLaborHours).toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground mt-1">Hours worked</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Gauge size={16} className={metrics.productivityRate <= 1 ? "text-success" : "text-warning"} />
+                  Productivity Rate
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className={cn("font-mono text-2xl font-bold", metrics.productivityRate <= 1 ? "text-success" : "text-warning")}>
+                  {metrics.productivityRate.toFixed(2)}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">{metrics.productivityRate <= 1 ? 'Efficient' : 'Over budget'}</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <TrendUp size={16} className="text-warning" />
+                  Overtime %
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className={cn("font-mono text-2xl font-bold", metrics.overtimePercentage < 10 ? "text-success" : "text-warning")}>
+                  {metrics.overtimePercentage.toFixed(1)}%
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Of total hours</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <User size={16} className="text-success" />
+                  Crew Utilization
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="font-mono text-2xl font-bold">{Math.round(metrics.crewUtilization)}%</div>
+                <p className="text-xs text-muted-foreground mt-1">Average utilization</p>
+                <Progress value={metrics.crewUtilization} className="mt-2 h-2" />
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="schedule" className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <ChartLine size={16} className={metrics.sv >= 0 ? "text-success" : "text-destructive"} />
+                  Schedule Variance (SV)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className={cn("font-mono text-2xl font-bold", metrics.sv >= 0 ? "text-success" : "text-destructive")}>
+                  {formatCurrency(metrics.sv)}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Earned vs Planned</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Gauge size={16} className={metrics.spi >= 1 ? "text-success" : "text-destructive"} />
+                  Schedule Performance Index
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className={cn("font-mono text-2xl font-bold", metrics.spi >= 1 ? "text-success" : "text-destructive")}>
+                  {metrics.spi.toFixed(2)}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">{metrics.spi >= 1 ? 'On schedule' : 'Behind schedule'}</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Target size={16} className="text-destructive" />
+                  Critical Path Tasks
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="font-mono text-2xl font-bold text-destructive">{metrics.criticalPathTasksCount}</div>
+                <p className="text-xs text-muted-foreground mt-1">Require attention</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Truck size={16} className="text-accent" />
+                  Procurement Lead Time
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="font-mono text-2xl font-bold">{Math.round(metrics.procurementLeadTimeDays)}</div>
+                <p className="text-xs text-muted-foreground mt-1">Days average</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <FileText size={16} className="text-warning" />
+                  RFI Turnaround
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className={cn("font-mono text-2xl font-bold", metrics.rfiTurnaroundDays < 5 ? "text-success" : "text-warning")}>
+                  {metrics.rfiTurnaroundDays.toFixed(1)}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Days average</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Cash Flow & Billing</CardTitle>
+                <CardDescription>Financial flow metrics</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                  <span className="text-sm font-medium">Total Billings</span>
+                  <span className="font-mono font-bold">{formatCurrency(metrics.billingsTotal)}</span>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                  <span className="text-sm font-medium">Earned Revenue</span>
+                  <span className="font-mono font-bold">{formatCurrency(metrics.earnedRevenueTotal)}</span>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-destructive/10">
+                  <span className="text-sm font-medium">AR Aging {'>'} 30 Days</span>
+                  <span className="font-mono font-bold text-destructive">{formatCurrency(metrics.arAgingOver30)}</span>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-destructive/10">
+                  <span className="text-sm font-medium">AR Aging {'>'} 60 Days</span>
+                  <span className="font-mono font-bold text-destructive">{formatCurrency(metrics.arAgingOver60)}</span>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-destructive/10">
+                  <span className="text-sm font-medium">AR Aging {'>'} 90 Days</span>
+                  <span className="font-mono font-bold text-destructive">{formatCurrency(metrics.arAgingOver90)}</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Cash Flow Forecast</CardTitle>
+                <CardDescription>Projected cash flow</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between p-3 rounded-lg bg-success/10">
+                  <span className="text-sm font-medium">30-Day Forecast</span>
+                  <span className="font-mono font-bold text-success">{formatCurrency(metrics.cashFlowForecast30Days)}</span>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-success/10">
+                  <span className="text-sm font-medium">60-Day Forecast</span>
+                  <span className="font-mono font-bold text-success">{formatCurrency(metrics.cashFlowForecast60Days)}</span>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-success/10">
+                  <span className="text-sm font-medium">90-Day Forecast</span>
+                  <span className="font-mono font-bold text-success">{formatCurrency(metrics.cashFlowForecast90Days)}</span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="risk" className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Wrench size={16} className="text-warning" />
+                  Rework Hours
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="font-mono text-2xl font-bold text-warning">{Math.round(metrics.reworkHours)}</div>
+                <p className="text-xs text-muted-foreground mt-1">Total rework time</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Shield size={16} className="text-destructive" />
+                  Safety Incidents
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="font-mono text-2xl font-bold text-destructive">{metrics.safetyIncidents}</div>
+                <p className="text-xs text-muted-foreground mt-1">Reported incidents</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <ChartLineUp size={16} className="text-warning" />
+                  EMR Impact
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="font-mono text-2xl font-bold text-warning">{metrics.emrImpact.toFixed(2)}</div>
+                <p className="text-xs text-muted-foreground mt-1">Rate impact</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <ListChecks size={16} className="text-accent" />
+                  Punch List Volume
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="font-mono text-2xl font-bold">{metrics.punchListVolume}</div>
+                <p className="text-xs text-muted-foreground mt-1">Open items</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <ClipboardText size={16} className="text-success" />
+                  Submittal Log Health
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className={cn("font-mono text-2xl font-bold", metrics.submittalLogHealth >= 80 ? "text-success" : "text-warning")}>
+                  {Math.round(metrics.submittalLogHealth)}%
+                </div>
+                <Progress value={metrics.submittalLogHealth} className="mt-2 h-2" />
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Operational Controls</CardTitle>
+                <CardDescription>Process health indicators</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                  <div className="flex items-center gap-3">
+                    <Laptop size={20} className="text-accent" />
+                    <span className="text-sm font-medium">Equipment Utilization</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Progress value={metrics.equipmentUtilization} className="w-24 h-2" />
+                    <span className="font-mono font-bold text-sm">{Math.round(metrics.equipmentUtilization)}%</span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                  <div className="flex items-center gap-3">
+                    <FileText size={20} className="text-warning" />
+                    <span className="text-sm font-medium">Drawing Revision Impact</span>
+                  </div>
+                  <span className="font-mono font-bold">{metrics.drawingRevisionImpact}</span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-6">
