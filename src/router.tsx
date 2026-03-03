@@ -8,6 +8,8 @@ import { ProjectDashboardPage } from '@/pages/projects/project-dashboard-page'
 import { ProjectSettingsPage } from '@/pages/projects/project-settings-page'
 import { SchedulePage } from '@/pages/schedule/schedule-page'
 import { ModernSchedulePage } from '@/pages/schedule/modern-schedule-page'
+import { ScheduleWithWBSPage } from '@/pages/schedule/schedule-with-wbs'
+import { WBSSettingsPage } from '@/pages/schedule/wbs-settings'
 import { FinancialsPage } from '@/pages/financials/financials-page'
 import { BudgetTrackingPage } from '@/pages/financials/budget-tracking-page'
 import { SOVTrackingPage } from '@/pages/financials/sov-tracking-page'
@@ -102,6 +104,14 @@ export const router = createBrowserRouter([
           },
           {
             path: 'schedule',
+            element: <ScheduleWithWBSPage />,
+          },
+          {
+            path: 'schedule/wbs-settings',
+            element: <WBSSettingsPage />,
+          },
+          {
+            path: 'schedule-modern',
             element: <ModernSchedulePage />,
           },
           {
