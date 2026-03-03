@@ -48,6 +48,7 @@ import { PMAPage } from '@/pages/projects/pma-page'
 import { PMADailyBriefPage } from '@/pages/projects/pma-daily-brief-page'
 import { DetailingPage } from '@/pages/detailing/detailing-page'
 import { WorkflowDashboardPage } from '@/pages/workflow/workflow-dashboard-page'
+import DataRecoveryPage from '@/pages/data-recovery'
 
 export const router = createBrowserRouter([
   {
@@ -85,6 +86,10 @@ export const router = createBrowserRouter([
       {
         path: 'electron-test',
         element: <ElectronTestSuitePage />,
+      },
+      {
+        path: 'data-recovery',
+        element: <DataRecoveryPage />,
       },
       {
         path: 'settings',
